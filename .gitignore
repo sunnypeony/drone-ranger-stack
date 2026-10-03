@@ -1,0 +1,33 @@
+# ROS 2
+build/
+install/
+log/
+
+# ROS bags
+*.db3
+*.mcap
+rosbags/
+bags/
+datasets/raw/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Large reconstruction outputs
+*.ply
+*.pcd
+*.las
+*.bag
+
+# Isaac Sim
+__pycache__/
