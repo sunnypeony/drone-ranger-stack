@@ -38,7 +38,6 @@ The system combines both real and simulated environments under a shared ROS 2 in
 </p>
 
 
-
 The Drone Ranger platform provides a unified ROS 2 interface across real-world and simulated UAV environments.
 The real platform integrates an OAK-D Lite RGB-D camera, LiDAR, Pixhawk/PX4, and NVIDIA Jetson companion computer.
 
@@ -56,6 +55,8 @@ The real platform integrates an OAK-D Lite RGB-D camera, LiDAR, Pixhawk/PX4, and
 - NVIDIA Jetson companion computer
 - OAK-D Lite RGB-D camera
 - YDLIDAR T-mini Plus LiDAR
+
+![alt text](docs/architecture/hardware_connection.png)
 
 ### Software
 
