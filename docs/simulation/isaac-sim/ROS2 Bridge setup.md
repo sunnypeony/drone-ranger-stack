@@ -73,6 +73,15 @@ Run `source /opt/ros/humble/setup.bash` before launching Isaac Sim, rather than 
     print("ROS2 Bridge OK")
 ```
 
+```bash
+python3 - << 'EOF'
+    import rclpy
+    from rcly.node import Node
+    rclpy.init()
+    print("ROS2 Bridge OK")
+EOF
+```
+
 
 
 ## Install MAVROS2(for PX4)

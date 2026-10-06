@@ -1,5 +1,127 @@
 
 
+# Installation
+
+	Sparse（SIFT / SfM） → CPU可以 ✔️
+	Dense（PatchMatch） → 必须CUDA ❌****
+
+
+#### Step 1 - Check version
+
+
+```bash
+# check OS version
+uname - #x86_64
+lsb_release -a #ubuntu22.04
+
+# check nvidia version
+nvidia-smi
+nvcc --version
+colmap -h | grep CUDA
+```
+#### Step 2 - Install Dependencies
+```
+apt install -y \
+  git cmake ninja-build
+  libopenimageio-dev \
+  openimageio-tools \
+  libopenexr-dev \
+  libsuitesparse-dev \
+  libgoogle-glog-dev \
+  libgflags-dev \
+  libglew-dev \
+  libgtest-dev \
+  libboost-all-dev \
+  libeigen3-dev \
+  libflann-dev \
+  libfreeimage-dev \
+  libmetis-dev \
+  libsqlite3-dev \
+  qtbase5-dev \
+  libqt5svg5-dev \
+  libqt5opengl5-dev \
+  libcgal-dev \
+  libceres-dev
+  
+```
+
+##### for Ubuntu24
+
+```bash
+apt update
+add-apt-repository universe -y
+apt update
+apt install -y software-properties-common
+apt install -y apt-transport-https ca-certificates gnupg
+```
+if openimageio incomplete,
+install openimageio-tools, and veriry `which iconvert`
+
+#### Step 3 - build
+
+```bash
+git clone https://github.com/colmap/colmap.git  
+cd colmap  
+mkdir build && cd build
+```
+
+
+```bash
+cmake .. -GNinja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCUDA_ENABLED=ON \
+  -DCMAKE_CUDA_ARCHITECTURES=89 # 89 = RTX 4090(Ada architecture), if without it, takes more time to build, or abnormal performance, or not support GPU
+```
+
+
+P.S.:
+- How to debug:
+==add-apt-repository== universe -y
+apt install -y software-properties-common
+
+
+If error occurs during build, decrease gcc:
+```bash
+apt install gcc-11 g++-11
+export CC=/usr/bin/gcc-11
+export CXX=/usr/bin/g++-11
+```
+
+
+
+#### Step 4 - Build & Install
+
+`ninja -j$(nproc)`
+
+```bash
+ninja
+ninja install
+```
+
+
+#### C Make issue
+
+
+sudo apt install -y \
+  cmake=3.30.2-0kitware1ubuntu22.04.1 \
+  cmake-data=3.30.2-0kitware1ubuntu22.04.1
+
+## 如果你想从源码编译（可选，适合最新版本）
+
+git clone https://ceres-solver.googlesource.com/ceres-solver  
+cd ceres-solver  
+mkdir build && cd build  
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF  
+make -j$(nproc)  
+make install
+
+然后在 COLMAP cmake 时指定：
+
+cmake .. -DCeres_DIR=/usr/local/lib/cmake/Ceres
+
+> 但对于 Ubuntu 容器，apt 包已经足够，而且更简单
+
+
 
 ## What is inside sparse/0?
 ```

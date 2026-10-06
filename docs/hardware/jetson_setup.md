@@ -1,6 +1,9 @@
 
 # Remote Connect to Jetson
-https://www.jetson-ai-lab.com/tutorials/getting-started-with-jetson/
+
+[tutorial](https://www.jetson-ai-lab.com/tutorials/getting-started-with-jetson/)
+
+[hardware layout](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/hardware_layout.html)
 
 1. Find a typeC to USB-A cable to connect from Jetson to PC:
 ```

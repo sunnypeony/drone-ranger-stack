@@ -61,4 +61,6 @@ from Jeston `/opt/ros/humble/…`
     static_transform publisher      ydlidar_ros2_driver_node
 ```
 
+[*Reference*](https://www.yahboom.net/study/T-mini_Plus)
+
 
