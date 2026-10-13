@@ -28,6 +28,7 @@ Use exactly these versions. They are the combination Pegasus is tested with.
 | px4_msgs | branch **`release/1.14`** | must match the PX4 version |
 | Micro-XRCE-DDS-Agent | v2.4.2 | PX4 ↔ ROS 2 bridge |
 | QGroundControl | latest AppImage | optional, for manual flying |
+| Isaac Lab (optional) | v2.3.0 | Python 3.11, shares the Isaac Sim install; see [§12](#12-using-pegasus-together-with-isaac-lab) |
 
 ## 1. How the pieces connect
 
@@ -147,6 +148,8 @@ isaac_run() {
 ```
 
 Run `source ~/.bashrc`, or open a new terminal.
+
+> `isaac_run` changes the environment of the terminal it runs in: ROS 2 is unset there afterwards. Use a dedicated terminal for Isaac Sim, and other terminals for `ros2` commands.
 
 ### 2.2 Verify Isaac Sim
 
@@ -409,3 +412,59 @@ Optional    ./QGroundControl-x86_64.AppImage                    (manual flight, 
 | QGroundControl does not see the vehicle | Simulation not playing; or another program bound UDP 14550. |
 | `[Fatal] [gpu.foundation.plugin] Out of resource descriptors` | Raise the open-file limit: `DefaultLimitNOFILE=65535` in `/etc/systemd/user.conf` and `* soft/hard nofile 65535` in `/etc/security/limits.conf`, then reboot. |
 | Depth image is all `inf` | Nothing within the camera clipping range (default 0.05–100 m), or the camera faces the sky. |
+
+---
+
+## 12. Using Pegasus together with Isaac Lab
+
+**Python versions do not conflict on this stack.**
+Isaac Sim 5.1, Pegasus v5.1.0 and Isaac Lab v2.3.0 all run on Isaac Sim's Python **3.11**.
+The 3.10 vs 3.11 conflict people remember comes from Isaac Sim 4.x (Python 3.10), or from ROS 2 Humble's Python 3.10.
+What does need care:
+
+| Issue | What happens | What to do |
+|---|---|---|
+| One shared interpreter | With the `_isaac_sim` symlink ([isaac_lab.md](../../auto_planning/isaac_lab.md)), `./isaaclab.sh --install` installs torch, RL libraries and version pins into the **same** `~/isaacsim/python.sh` that Pegasus uses | Install in a fixed order and re-check Pegasus afterwards (below) |
+| Active conda env | `isaaclab.sh` uses `$CONDA_PREFIX/bin/python` whenever a conda env is active, **including `base`**. Install and run then happen in a different Python, often not 3.11 | `conda deactivate` before every `isaaclab.sh` call (the `isaaclab_run` wrapper checks this) |
+| System ROS 2 sourced | Same Python 3.10 `rclpy` problem as in §2.1; `isaaclab.sh` does not clean the environment | Use the `isaaclab_run` wrapper in [isaac_lab.md](../../auto_planning/isaac_lab.md) |
+| Different Kit app | Isaac Lab scripts start `isaaclab.python*.kit`, which does not load Pegasus or its dependencies (`omni.isaac.core`, `omni.isaac.dynamic_control`, `isaacsim.replicator.agent.core`) | Only if you really need Pegasus inside an Isaac Lab script: `--kit_args "--ext-folder ${HOME}/PegasusSimulator/extensions --enable pegasus.simulator"` |
+| One simulation context | Pegasus's `World` and Isaac Lab's `SimulationContext` both derive from the same `isaacsim.core.api` singleton. Isaac Lab also runs many cloned envs on the GPU, while each PX4 vehicle needs its own lockstep SITL process | Do **not** mix them in one process; use them for separate jobs (below) |
+
+### Recommended split
+
+```
+Isaac Lab (isaaclab_run / isaaclab.sh -p)            Pegasus + PX4 (isaac_run)
+──────────────────────────────────────────          ─────────────────────────────────────
+policy / perception training                         SITL validation with the real autopilot
+thousands of parallel envs, no PX4                   1..N vehicles, PX4 v1.14.3 in lockstep
+e.g. Isaac-Quadcopter-Direct-v0 as a starting point  /fmu/* via uXRCE-DDS, cameras via ROS 2
+              │                                                     ▲
+              └──── trained policy (.pt / .onnx) ───────────────────┘
+                    run as a ROS 2 node → /fmu/in/trajectory_setpoint (offboard)
+        both load the same scene USD (e.g. backyard.usd from colmap_pipeline.md)
+```
+
+Same Isaac Sim install, two entry points, one shared scene asset.
+Training does not need PX4. Validation does not need Isaac Lab.
+
+### Install order on a shared Isaac Sim
+
+1. Isaac Sim 5.1.0 + `isaac_run` (§2), verified.
+2. Pegasus (§4), then run `isaac_run ~/PegasusSimulator/examples/1_px4_single_vehicle.py` once.
+3. Isaac Lab ([isaac_lab.md](../../auto_planning/isaac_lab.md)), with conda deactivated.
+4. Check both still work and record the environment:
+   ```bash
+   "$ISAACSIM_PYTHON" -m pip check
+   isaac_run ~/PegasusSimulator/examples/1_px4_single_vehicle.py                 # Pegasus still OK
+   isaaclab_run ~/IsaacLab/scripts/tutorials/00_sim/create_empty.py               # Isaac Lab OK
+   "$ISAACSIM_PYTHON" -m pip freeze > ~/isaacsim_python_freeze.txt                # keep this with your experiment notes
+   ```
+
+### Fully isolated alternative
+
+If the Isaac Lab dependencies keep breaking Pegasus, install Isaac Lab against a **pip-installed** Isaac Sim instead of the symlink.
+That means a Python 3.11 `uv`/conda env with `pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com`,
+following the Isaac Lab pip installation guide.
+Pegasus keeps the untouched `~/isaacsim` binary install.
+This costs a second copy of Isaac Sim on disk (tens of GB), but the two environments can no longer affect each other.
+
