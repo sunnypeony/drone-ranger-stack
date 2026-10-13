@@ -217,6 +217,13 @@ The simulation workflow targets Isaac Sim, Pegasus, and PX4-based validation:
 
 This is intended to bridge the gap between offline world reconstruction and real-time drone autonomy evaluation.
 
+Setup guides, in order:
+
+1. [`docs/simulation/isaac-sim/px4_SITL.md`](docs/simulation/isaac-sim/px4_SITL.md): build PX4 v1.14.3, uXRCE-DDS agent, `px4_msgs`, and check PX4 → ROS 2 without a simulator
+2. [`docs/simulation/isaac-sim/pegasus.md`](docs/simulation/isaac-sim/pegasus.md): **end-to-end** Isaac Sim 5.1 + Pegasus Simulator v5.1.0 + PX4 setup, version matrix, first flight, ROS 2 camera/depth topics
+3. [`docs/simulation/isaac-sim/ROS2 Bridge setup.md`](<docs/simulation/isaac-sim/ROS2 Bridge setup.md>): ROS 2 Humble install and Isaac Sim ROS 2 bridge details
+4. [`docs/simulation/isaac-sim/cameras.md`](docs/simulation/isaac-sim/cameras.md): manual OmniGraph camera / depth publishing
+
 ## Documentation
 
 Useful project documentation is organized into the following areas:

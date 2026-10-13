@@ -11,8 +11,8 @@
 
 ```bash
 # check OS version
-uname - #x86_64
-lsb_release -a #ubuntu22.04
+uname -m   # x86_64
+lsb_release -a   # Ubuntu 22.04
 
 # check nvidia version
 nvidia-smi
@@ -20,9 +20,9 @@ nvcc --version
 colmap -h | grep CUDA
 ```
 #### Step 2 - Install Dependencies
-```
+```bash
 apt install -y \
-  git cmake ninja-build
+  git cmake ninja-build \
   libopenimageio-dev \
   openimageio-tools \
   libopenexr-dev \
@@ -42,7 +42,6 @@ apt install -y \
   libqt5opengl5-dev \
   libcgal-dev \
   libceres-dev
-  
 ```
 
 ##### for Ubuntu24
@@ -75,9 +74,12 @@ cmake .. -GNinja \
 
 
 P.S.:
-- How to debug:
-==add-apt-repository== universe -y
+- If some packages above cannot be found, enable the `universe` repository first:
+```bash
 apt install -y software-properties-common
+add-apt-repository universe -y
+apt update
+```
 
 
 If error occurs during build, decrease gcc:
@@ -99,25 +101,32 @@ ninja install
 ```
 
 
-#### C Make issue
+#### CMake issue
 
-
+If COLMAP requires a newer CMake than Ubuntu 22.04 provides, install it from the Kitware apt repository
+(see https://apt.kitware.com/ for adding the repository first), then pin the version:
+```bash
 sudo apt install -y \
   cmake=3.30.2-0kitware1ubuntu22.04.1 \
   cmake-data=3.30.2-0kitware1ubuntu22.04.1
+```
 
 ## 如果你想从源码编译（可选，适合最新版本）
 
-git clone https://ceres-solver.googlesource.com/ceres-solver  
-cd ceres-solver  
-mkdir build && cd build  
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF  
-make -j$(nproc)  
+```bash
+git clone https://ceres-solver.googlesource.com/ceres-solver
+cd ceres-solver
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+make -j$(nproc)
 make install
+```
 
 然后在 COLMAP cmake 时指定：
 
+```bash
 cmake .. -DCeres_DIR=/usr/local/lib/cmake/Ceres
+```
 
 > 但对于 Ubuntu 容器，apt 包已经足够，而且更简单
 

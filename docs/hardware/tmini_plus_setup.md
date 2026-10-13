@@ -5,12 +5,12 @@
 `sudo apt install swig` (for python SDK installation)
 
 
-```
+```bash
 cd YDLidar-SDK
-Mkdir build && cd build
-Cmake ..
-Make
-Sudo make install
+mkdir build && cd build
+cmake ..
+make
+sudo make install
 ```
 
 Just copy `/src`, generate `/build`, `/install`, `/log`, each machine itself.
@@ -46,7 +46,7 @@ ros2 launch ydlidar_ros2_driver ydlidar_launch.py
 
 The launch will start two process:
 - ydlidar_ros2_driver_node:
-from `~/lidar_T-mini-plus/yahboomcar_was/install/..`
+from `~/lidar_T-mini-plus/yahboomcar_ws/install/..`
 - static_transform_publisher:
 from Jeston `/opt/ros/humble/…`
 
