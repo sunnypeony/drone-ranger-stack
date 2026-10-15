@@ -314,81 +314,39 @@ This step is done in the Isaac Sim environment (RunPod GPU).
 ### Step 6.1: Transfer the mesh file to RunPod
 ```bash
 # Run on the local machine
-scp ~/backyard_reconstruction/mesh/scene_clean.obj \
-    root@your_runpod_ip:/root/scene_clean.obj -P your_port
+scp -P your_port ~/backyard_reconstruction/mesh/scene_clean.obj \
+    root@your_runpod_ip:/root/backyard_reconstruction/mesh/scene_clean.obj
 ```
 
-### Step 6.2: Import OBJ and convert it to USD
-Run the following in the Isaac Sim Script Editor:
-```python
-# import_scene_mesh.py
-import omni.kit.commands
-import omni.usd
-from pxr import UsdPhysics, PhysxSchema, Gf
+### Step 6.2: Import the mesh, align it and add collision
+Open [`simulation/isaac_sim/usr_scripts/import_scene_mesh.py`](../../simulation/isaac_sim/usr_scripts/import_scene_mesh.py) in the Isaac Sim Script Editor (`Window -> Script Editor`).
+Set `MESH_PATH` at the top and run it. The script:
 
-stage = omni.usd.get_context().get_stage()
+1. converts `scene_clean.obj` to `scene_clean.usd` with `omni.kit.asset_converter` (USD cannot reference an OBJ directly);
+2. references it at `/World/BackyardScene/mesh` and applies translate / rotate / scale to `/World/BackyardScene`;
+3. applies `UsdPhysics.CollisionAPI` + `MeshCollisionAPI` to **every `Mesh` prim** under it.
 
-# 1. Import OBJ (Isaac Sim automatically converts it to USD)
-omni.kit.commands.execute(
-    "CreateReferenceCommand",
-    usd_context=omni.usd.get_context(),
-    path_to="/World/BackyardMesh",
-    asset_path="/root/scene_clean.obj",
-    instanceable=False)
-print("Mesh imported.")
+Things that are easy to get wrong:
 
-# 2. Find the mesh prim
-mesh_prim = stage.GetPrimAtPath("/World/BackyardMesh")
+- Collision APIs only work on the `Mesh` prims. Applying them to the referenced root `Xform` has no effect.
+- A static environment needs **no** `RigidBodyAPI`: a collider without a rigid body is static.
+- Approximation options for the mesh collider:
+  - `"none"` (exact triangle mesh): the default in the script and the standard choice for static scenes.
+  - `"convexDecomposition"`: cheaper, but fills in concave regions such as doorways and gaps between trees.
+  - `"sdf"`: meant for dynamic bodies with complex shapes; not needed here.
 
-# 3. Add collision properties
-collision_api = UsdPhysics.CollisionAPI.Apply(mesh_prim)
-
-# 4. Set the mesh collision approximation mode
-# SDF: most accurate, supports concave shapes, and is suitable for complex outdoor scenes
-mesh_collision = UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
-mesh_collision.GetApproximationAttr().Set("sdf")
-
-# 5. Add PhysX collision config
-physx_collision = PhysxSchema.PhysxCollisionAPI.Apply(mesh_prim)
-
-# 6. Keep the scene static (static rigid body)
-UsdPhysics.RigidBodyAPI.Apply(mesh_prim)
-rb = UsdPhysics.RigidBodyAPI(mesh_prim)
-rb.GetRigidBodyEnabledAttr().Set(False)  # not affected by gravity, remains fixed
-print("Collision API applied.")
-print("Approximation: SDF (most accurate for complex outdoor scenes)")
-```
-
-> 💡 The `approximation` parameter has three options:
->
-> - `"sdf"`: most accurate, preserves all concave details, slightly slower, recommended for outdoor scenes
-> - `"convexDecomposition"`: automatically decomposes into several convex bodies, faster, but loses detail
-> - `"none"`: exact mesh collision; most accurate for static scenes but slowest
+When it looks right, save the stage (`File -> Save As`, e.g. `backyard.usd`).
+That file can be loaded straight into a Pegasus simulation with `pg.load_environment(".../backyard.usd")`; see [pegasus.md](../simulation/isaac-sim/pegasus.md#9-use-your-own-scene-reconstructed-backyard).
 
 ### Step 6.3: Position the scene at the correct location and scale
-The scene coordinate system reconstructed by COLMAP may not align with Isaac Sim. You need to adjust it:
-```python
-# align_scene.py
-from pxr import UsdGeom, Gf
-import omni.usd
+COLMAP's world frame is arbitrary: it is not Y-up or Z-up by design, and it has **no metric scale**.
+Adjust `ROTATE_XYZ_DEG`, `SCALE` and `TRANSLATE` at the top of the script and re-run it:
 
-stage = omni.usd.get_context().get_stage()
-mesh_prim = stage.GetPrimAtPath("/World/BackyardMesh")
-xform = UsdGeom.Xformable(mesh_prim)
-xform.ClearXformOpOrder()
-
-# Translation: bring the scene center near the origin
-xform.AddTranslateOp().Set(Gf.Vec3d(0, 0, 0))
-
-# Scaling: COLMAP output is in relative units and needs calibration
-# If you know the real distance between two points in the scene (e.g. a gate width of 1 m),
-# you can calculate the scale factor; otherwise start with 1.0 and adjust visually
-xform.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))
-
-# Rotation: make the ground face upward (Z-up)
-# COLMAP uses Y-up by default, while Isaac Sim uses Z-up
-xform.AddRotateXYZOp().Set(Gf.Vec3f(-90, 0, 0))
-```
+- **Rotation**: rotate until the ground is horizontal in Isaac Sim's Z-up world. `-90°` about X is a common starting point, not a rule.
+  `colmap model_aligner` (e.g. `--alignment_type plane`) can level the sparse model before meshing.
+- **Scale**: measure a known distance in the scene, such as a gate width of ≈ 1 m, and set `SCALE = real / measured`.
+  Without this, depth values in simulation do not match reality.
+- **Translation**: bring the area you want to fly in near the origin and put the ground at `z = 0`, so the drone spawns above it.
 
 ## Phase 7: Verify that the depth camera can detect collisions
 After spawning the Pegasus drone into the scene, run the camera script from Phase 3 and validate it.
@@ -453,7 +411,7 @@ Original mesh (mesh/scene_mesh.obj, millions of faces)
     ▼ Blender Decimate (keep 5%)
 Simplified mesh (mesh/scene_clean.obj, <500k faces)
     │
-    ▼ Isaac Sim import + UsdPhysics.CollisionAPI (SDF)
+    ▼ Isaac Sim import + UsdPhysics.CollisionAPI (static triangle mesh)
 Collision-enabled simulation scene
     │
     ▼ Pegasus drone + Action Graph depth camera
@@ -484,7 +442,7 @@ Solution: increase the Poisson depth parameter (from 10 to 11), or reshoot and r
 
 **Q: The scene orientation or scale is wrong after import into Isaac Sim**
 ```
-Solution: adjust RotateXYZOp and ScaleOp in align_scene.py
+Solution: adjust ROTATE_XYZ_DEG / SCALE / TRANSLATE in import_scene_mesh.py and re-run it
           inspect the coordinate range of the sparse cloud with COLMAP model_analyzer
           estimate the scale factor using real-world distances (e.g. gate width ≈ 1 m)
 ```

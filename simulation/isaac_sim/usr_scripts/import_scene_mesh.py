@@ -1,39 +1,81 @@
-# import the simplified mesh into Isaac Sim and set up collision properties
+# Import the simplified reconstruction mesh into Isaac Sim as a static collider.
+# Run in the Isaac Sim Script Editor (Window -> Script Editor).
+#
+# 1. Converts the OBJ to USD (OBJ cannot be referenced directly by USD).
+# 2. References it under SCENE_PRIM_PATH/mesh and aligns SCENE_PRIM_PATH to Isaac Sim's Z-up world.
+# 3. Adds static triangle-mesh collision to every Mesh prim inside it.
+#
+# Save the stage afterwards (File -> Save As) to get a .usd that
+# PegasusInterface().load_environment() can load directly.
 
+import asyncio
+import os
 
+import omni.kit.asset_converter
 import omni.kit.commands
 import omni.usd
-from pxr import UsdPhysics, PhysxSchema, UsdGeom, Gf
+from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
-stage = omni.usd.get_context().get_stage()
+MESH_PATH = os.path.expanduser("~/backyard_reconstruction/mesh/scene_clean.obj")   # .obj or .usd
+SCENE_PRIM_PATH = "/World/BackyardScene"   # Xform owned by this script; the mesh is referenced below it
 
-# 1. Import OBJ(Isaac Sim automatically convert into USD)
-omni.kit.commands.execute(
-    "CreateReferenceCommand",
-    usd_context=omni.usd.get_context(),
-    path_to="/World/BackyardMesh",
-    asset_path="/root/scene_clean.obj",
-    instanceable=False)
-print("Mesh imported into Isaac Sim.")
+# COLMAP's world frame is arbitrary and unscaled: adjust these until the ground is
+# horizontal at z = 0 and a known distance (e.g. a 1 m gate) measures correctly.
+ROTATE_XYZ_DEG = Gf.Vec3f(-90.0, 0.0, 0.0)
+SCALE = 1.0
+TRANSLATE = Gf.Vec3d(0.0, 0.0, 0.0)
+
+# "none" = exact triangle mesh, the standard choice for static environment geometry.
+# "convexDecomposition" is cheaper but fills in concave shapes.
+# ("sdf" is meant for dynamic bodies and is not needed for a static scene.)
+COLLISION_APPROXIMATION = "none"
 
 
-# 2. Find the imported mesh prim
-mesh_prim = stage.GetPrimAtPath("/World/BackyardMesh")
+async def _convert_to_usd(src_path):
+    dst_path = os.path.splitext(src_path)[0] + ".usd"
+    converter = omni.kit.asset_converter.get_instance()
+    task = converter.create_converter_task(src_path, dst_path, None)
+    if not await task.wait_until_finished():
+        raise RuntimeError(f"Mesh conversion failed: {task.get_error_message()}")
+    print(f"Converted {src_path} -> {dst_path}")
+    return dst_path
 
-# 3. Align coordinate system (COLMAP Y-up → Isaac Sim Z-up)
-xform = UsdGeom.Xformable(mesh_prim)
-xform.ClearXformOpOrder()
-xform.AddRotateXYZOp().Set(Gf.Vec3f(-90, 0, 0))
-xform.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 1.0))  # 按需调整尺度
 
-# 4. Add collision properties
-UsdPhysics.CollisionAPI.Apply(mesh_prim)
+async def import_scene_mesh():
+    stage = omni.usd.get_context().get_stage()
+    root = UsdGeom.Xform.Define(stage, SCENE_PRIM_PATH).GetPrim()
+    mesh_root_path = SCENE_PRIM_PATH + "/mesh"
 
-mesh_col = UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
-mesh_col.GetApproximationAttr().Set("sdf")  # 最精确，保留凹面
+    # Re-running only re-applies the transform and collision settings below
+    if not stage.GetPrimAtPath(mesh_root_path).IsValid():
+        if not os.path.isfile(MESH_PATH):
+            raise FileNotFoundError(MESH_PATH)
+        usd_path = MESH_PATH if MESH_PATH.endswith((".usd", ".usda", ".usdc")) else await _convert_to_usd(MESH_PATH)
+        omni.kit.commands.execute(
+            "CreateReferenceCommand",
+            usd_context=omni.usd.get_context(),
+            path_to=mesh_root_path,
+            asset_path=usd_path,
+            instanceable=False,
+        )
 
-# 设为静态（不受重力）
-rb = UsdPhysics.RigidBodyAPI.Apply(mesh_prim)
-rb.GetRigidBodyEnabledAttr().Set(False)
+    # The transform goes on our own parent Xform, so it never clashes with ops inside the asset
+    xform = UsdGeom.Xformable(root)
+    xform.ClearXformOpOrder()
+    xform.AddTranslateOp().Set(TRANSLATE)
+    xform.AddRotateXYZOp().Set(ROTATE_XYZ_DEG)
+    xform.AddScaleOp().Set(Gf.Vec3f(SCALE, SCALE, SCALE))
 
-print("Scene imported with SDF collision.")
+    # Collision APIs must sit on the Mesh prims; on the parent Xform they have no effect.
+    # No RigidBodyAPI: a collider without a rigid body is static.
+    meshes = [prim for prim in Usd.PrimRange(root) if prim.IsA(UsdGeom.Mesh)]
+    for prim in meshes:
+        UsdPhysics.CollisionAPI.Apply(prim)
+        UsdPhysics.MeshCollisionAPI.Apply(prim).CreateApproximationAttr().Set(COLLISION_APPROXIMATION)
+
+    if not meshes:
+        print(f"Warning: no Mesh prims found under {SCENE_PRIM_PATH}")
+    print(f"Scene at {SCENE_PRIM_PATH}: collision ({COLLISION_APPROXIMATION}) on {len(meshes)} mesh(es).")
+
+
+asyncio.ensure_future(import_scene_mesh())
