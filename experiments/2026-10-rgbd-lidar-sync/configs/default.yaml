@@ -31,6 +31,7 @@ frames:
   base: base_link
   camera_optical: oak_rgb_camera_optical_frame
   laser: laser_frame
+  tf_static_policy: first      # /tf_static published twice with different laser offsets; first message wins
 
 typestore: ROS2_HUMBLE
 
@@ -46,7 +47,7 @@ extract:
   match_tolerance_ns: 0        # 0 = exact header.stamp match; >0 = nearest-neighbour fallback
   frame_stride: 2
   depth_min: 0.3               # m
-  depth_max: 4.0               # m
+  depth_max: 5.0               # m (also TSDF depth_trunc)
   depth_32fc1_scale: 1.0       # 32FC1 depth is in metres (REP 117)
   depth_16uc1_scale: 0.001     # 16UC1 depth is in millimetres
   denoise: none                # none | median | bilateral
@@ -64,15 +65,36 @@ poses:
   tf_interp_max_gap_s: 0.5     # do not interpolate across TF gaps larger than this
   # --- open3d odometry ---
   keyframe_stride: 1           # use every Nth extracted frame as a keyframe
-  odometry_depth_max: 3.0      # m, depth cutoff used for odometry
+  odometry_depth_max: 4.0      # m, depth cutoff used for odometry
   odometry_depth_diff_max: 0.07
   odometry_min_depth: 0.3
   odometry_iterations: [20, 10, 5]   # coarse -> fine pyramid levels
   odometry_min_valid_ratio: 0.05     # skip/flag pairs whose depth is mostly empty
-  odometry_max_translation: 0.3      # m per keyframe step; larger = treat as failure
-  odometry_max_rotation_deg: 20.0    # per keyframe step; larger = treat as failure
+  odometry_max_translation: 0.08     # m per keyframe step (~1.2 m/s at 15 Hz); larger = treat as failure
+  odometry_max_rotation_deg: 8.0     # per keyframe step; larger = treat as failure
+  odometry_fallback_window: 5        # failed step = median of the last N good steps
+  odometry_verify: true              # geometric check (cloud fitness) of every odometry step
+  odometry_verify_fitness_min: 0.5   # at icp_voxel * icp_eval_dist_scale
+  odometry_icp_fallback: true        # colored ICP when RGB-D odometry fails (robust to motion blur)
   odometry_info_min: 1000.0          # min info[5,5] (point count proxy); smaller = failure
   odometry_fail_info_scale: 1.0      # information (x I6) of an extrapolated (failed) odometry edge
+  # --- ground-plane constraint (assumes a roughly flat ground, true for this yard) ---
+  ground_constraint: true      # correct roll/pitch + height from the per-frame ground plane
+  ground_refine_after_pgo: true
+  ground_roi_top_frac: 0.5     # only use the lower part of the image
+  ground_pixel_stride: 2
+  ground_max_depth: 4.0        # m
+  ground_ransac_dist: 0.03     # m
+  ground_ransac_iters: 300
+  ground_min_points: 2000
+  ground_min_inlier_frac: 0.3
+  ground_max_angle_deg: 40.0   # vs camera up at t0
+  ground_min_valid_frames: 20
+  ground_smooth_window: 31     # keyframes, windowed median of corrections / heights
+  ground_fix_height: true
+  ground_outlier_window: 151   # keyframes, long median used to reject bad plane fits
+  ground_outlier_max_deg: 4.0
+  ground_outlier_max_height: 0.12  # m
   # --- loop closure ---
   loop_min_gap_s: 20.0
   loop_max_dist: 1.0           # m, candidate gate on current pose estimate
@@ -103,7 +125,9 @@ poses:
   # --- outputs ---
   preview_every: 10
   preview_voxel: 0.03
-  preview_depth_max: 3.0
+  preview_depth_max: 4.0
+  preview_ground_percentile: 5
+  preview_slice_above_ground: [0.4, 1.2]   # m, height band for the ghosting slice
   head_tail_warn_m: 0.3
   rigid_det_tol: 1.0e-3
   rigid_orth_tol: 1.0e-3
@@ -117,7 +141,8 @@ tsdf:
   checkpoint_every: 200        # frames; partial mesh/pointcloud checkpoint (resume = re-integrate up to done frames)
 
 mesh:
-  min_cluster_ratio: 0.02      # keep largest cluster + clusters with area > ratio * total area
+  min_cluster_ratio: 0.001     # keep largest cluster + clusters with area > ratio * total area.
+                               # (task default was 0.02; on this data that deletes the table: 0.34% of area)
   target_triangles: 200000
   level_ground: true
   ground_distance_threshold: 0.03
@@ -141,8 +166,9 @@ usd:
 lidar:
   enabled: true
   scan_stride: 5               # use every Nth scan
-  range_min: 0.12
+  range_min: 0.6              # m; shorter returns are mostly the operator holding the rig
   range_max: 12.0
+  compare_range_max: 4.0       # m; distance metric only where the RGB-D mesh can exist
   slice_half_thickness: 0.05   # m, mesh slice around the laser plane height
   max_time_offset_s: 0.0       # added to scan stamp before trajectory lookup
   plot_extent_margin: 1.0

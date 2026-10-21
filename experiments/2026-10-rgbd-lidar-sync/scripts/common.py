@@ -307,13 +307,26 @@ def interp_T(t_query: int, times: np.ndarray, Ts: np.ndarray, max_gap_ns: int):
 
 
 class StaticTF:
-    """Static TF tree (parent->child) with chain lookup."""
+    """Static TF tree (parent->child) with chain lookup.
+    policy="first": the first message for a child frame wins, later differing ones are logged as conflicts."""
 
-    def __init__(self):
+    def __init__(self, policy: str = "first"):
+        if policy not in ("first", "last"):
+            die(f"unknown tf_static_policy {policy}")
+        self.policy = policy
         self.edges: dict[str, tuple[str, np.ndarray]] = {}  # child -> (parent, T_parent_child)
+        self.conflicts: list[dict] = []
 
     def add(self, parent: str, child: str, T: np.ndarray):
-        self.edges[child.lstrip("/")] = (parent.lstrip("/"), T)
+        child, parent = child.lstrip("/"), parent.lstrip("/")
+        if child in self.edges:
+            p0, T0 = self.edges[child]
+            if p0 != parent or not np.allclose(T0, T, atol=1e-9):
+                self.conflicts.append({"child": child, "kept_parent": p0, "kept_T": T0.tolist(),
+                                       "other_parent": parent, "other_T": T.tolist(), "policy": self.policy})
+            if self.policy == "first":
+                return
+        self.edges[child] = (parent, T)
 
     def _chain_to_root(self, frame):
         chain, f = [frame], frame
@@ -348,10 +361,14 @@ class StaticTF:
 
 
 def load_static_tf(reader, typestore, cfg) -> StaticTF:
-    st = StaticTF()
+    st = StaticTF(cfg["frames"].get("tf_static_policy", "first"))
     for _, msg in iter_topic(reader, typestore, cfg["topics"]["tf_static"]):
         for tr in msg.transforms:
             st.add(tr.header.frame_id, tr.child_frame_id, tf_msg_to_T(tr.transform))
+    for c in st.conflicts:
+        print(f"[warn] /tf_static conflict for {c['child']}: keeping {c['policy']} message "
+              f"(t={np.round(np.array(c['kept_T'])[:3, 3], 4).tolist()}), ignoring "
+              f"t={np.round(np.array(c['other_T'])[:3, 3], 4).tolist()}")
     return st
 
 

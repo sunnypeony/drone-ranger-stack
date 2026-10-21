@@ -1,0 +1,11 @@
+# Python 3.10-3.12 (open3d 0.19 has no wheel for 3.13). Tested with Python 3.12 on Ubuntu 24.04 x86_64.
+rosbags==0.11.9
+open3d==0.19.0
+numpy==2.5.4
+opencv-python-headless==5.0.0.93   # headless build: no GUI needed on servers
+PyYAML==6.0.3
+matplotlib==3.11.2
+huggingface_hub==2.2.0
+usd-core==26.8
+tqdm==4.70.1
+scipy==1.18.1                      # Slerp / quaternion conversion

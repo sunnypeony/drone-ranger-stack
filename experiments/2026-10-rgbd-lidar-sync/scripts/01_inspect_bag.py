@@ -119,6 +119,8 @@ def main():
             "base_to_laser_exists": T_bl is not None,
             "T_base_optical": None if T_bo is None else T_bo.tolist(),
             "T_base_laser": None if T_bl is None else T_bl.tolist(),
+            "policy": st.policy,
+            "conflicts": st.conflicts,
         }
         if F["camera_optical"] not in st.frames() and ci["frame_id"] != F["camera_optical"]:
             print(f"[warn] configured optical frame {F['camera_optical']} not in tf_static and != CameraInfo frame "

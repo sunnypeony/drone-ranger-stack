@@ -1,0 +1,275 @@
+{
+  "bag_dir": "/home/user/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/data/raw/rosbag2_trimmed",
+  "bag_size_bytes": 6940712108,
+  "bag_size": "6.5GB",
+  "storage": [
+    "rosbag2_trimmed_0.db3"
+  ],
+  "bag_duration_s": 179.976996594,
+  "topics": {
+    "/oak/depth/camera_info": {
+      "type": "sensor_msgs/msg/CameraInfo",
+      "count": 5401,
+      "first_ns": 1789436446542464399,
+      "last_ns": 1789436626510164577,
+      "duration_s": 179.967700178,
+      "rate_hz": 30.00538426983865
+    },
+    "/oak/depth/image_raw": {
+      "type": "sensor_msgs/msg/Image",
+      "count": 5401,
+      "first_ns": 1789436446551836560,
+      "last_ns": 1789436626510058461,
+      "duration_s": 179.958221901,
+      "rate_hz": 30.00696463299515
+    },
+    "/oak/rgb/camera_info": {
+      "type": "sensor_msgs/msg/CameraInfo",
+      "count": 5401,
+      "first_ns": 1789436446542738680,
+      "last_ns": 1789436626510177794,
+      "duration_s": 179.967439114,
+      "rate_hz": 30.005427796188073
+    },
+    "/oak/rgb/image_raw": {
+      "type": "sensor_msgs/msg/Image",
+      "count": 5401,
+      "first_ns": 1789436446549213590,
+      "last_ns": 1789436626519460992,
+      "duration_s": 179.970247402,
+      "rate_hz": 30.004959586114285
+    },
+    "/scan": {
+      "type": "sensor_msgs/msg/LaserScan",
+      "count": 1776,
+      "first_ns": 1789436449325486425,
+      "last_ns": 1789436626506966227,
+      "duration_s": 177.181479802,
+      "rate_hz": 10.017977059360602
+    },
+    "/tf_static": {
+      "type": "tf2_msgs/msg/TFMessage",
+      "count": 2,
+      "first_ns": 1789436446557588310,
+      "last_ns": 1789436449321678454,
+      "duration_s": 2.764090144,
+      "rate_hz": 0.3617827016860128
+    }
+  },
+  "images": {
+    "rgb": {
+      "encoding": "bgr8",
+      "width": 640,
+      "height": 400,
+      "step": 1920,
+      "is_bigendian": 0,
+      "frame_id": "oak_rgb_camera_optical_frame"
+    },
+    "depth": {
+      "encoding": "16UC1",
+      "width": 640,
+      "height": 400,
+      "step": 1280,
+      "is_bigendian": 0,
+      "frame_id": "oak_rgb_camera_optical_frame"
+    }
+  },
+  "camera_info": {
+    "width": 640,
+    "height": 400,
+    "K": [
+      [
+        553.7770385742188,
+        0.0,
+        329.0152587890625
+      ],
+      [
+        0.0,
+        553.8973999023438,
+        189.52587890625
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "D": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "distortion_model": "plumb_bob",
+    "frame_id": "oak_rgb_camera_optical_frame",
+    "D_all_zero": true
+  },
+  "stamp_match": {
+    "rgb_count": 5401,
+    "depth_count": 5401,
+    "camera_info_count": 5401,
+    "rgb_unique": 5401,
+    "depth_unique": 5401,
+    "rgb_depth_exact": 5401,
+    "rgb_depth_exact_ratio_of_rgb": 1.0,
+    "rgb_depth_exact_ratio_of_depth": 1.0,
+    "rgb_caminfo_exact_ratio_of_rgb": 1.0,
+    "triple_exact": 5401,
+    "bag_minus_header_ms_depth_median": 4.480442
+  },
+  "tf_static": {
+    "frames": [
+      "base_link",
+      "laser_frame",
+      "oak_rgb_camera_frame",
+      "oak_rgb_camera_optical_frame"
+    ],
+    "edges": {
+      "oak_rgb_camera_frame": "base_link",
+      "oak_rgb_camera_optical_frame": "oak_rgb_camera_frame",
+      "laser_frame": "base_link"
+    },
+    "base_to_optical_exists": true,
+    "base_to_laser_exists": true,
+    "T_base_optical": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.125
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_base_laser": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.125
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.025
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "policy": "first",
+    "conflicts": [
+      {
+        "child": "laser_frame",
+        "kept_parent": "base_link",
+        "kept_T": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.125
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.025
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "other_parent": "base_link",
+        "other_T": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.02
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "policy": "first"
+      }
+    ]
+  },
+  "tf_dynamic_pairs": {},
+  "odometry": {
+    "odom_topic_present": false,
+    "odom_to_base_source": null,
+    "samples": 0,
+    "coverage_of_rgbd_pairs": 0.0,
+    "available": false,
+    "span_s": 0.0
+  },
+  "depth_stats": {
+    "sampled": 541,
+    "valid_ratio_mean": 0.7767941240180222,
+    "valid_ratio_min": 0.6734296875,
+    "valid_ratio_max": 0.861171875,
+    "in_range_ratio_mean": 0.3612325698937154,
+    "median_depth_m_mean": 5.658227619093579,
+    "range_used": [
+      0.3,
+      5.0
+    ]
+  },
+  "sample_frame": {
+    "pair_index": 50,
+    "stamp_ns": 1789436448202849771
+  },
+  "errors": []
+}

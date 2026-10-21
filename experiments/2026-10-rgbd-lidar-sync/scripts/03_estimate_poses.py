@@ -85,17 +85,50 @@ def step_ok(T, info, P):
             and info[5, 5] >= P["odometry_info_min"])
 
 
+def fallback_step(trans, status, k, P):
+    """Constant-velocity guess: the recent good step with median translation (robust to one bad step)."""
+    good = [m for m in range(max(0, k - P["odometry_fallback_window"]), k) if status[m] in (0, 2)]
+    if not good:
+        return np.eye(4)
+    norms = [np.linalg.norm(trans[m][:3, 3]) for m in good]
+    return trans[good[int(np.argsort(norms)[len(norms) // 2])]].copy()
+
+
+def verify_step(fc, i, j, T, P, o3d):
+    """Geometric check of an odometry result: fitness/RMSE of the two down-sampled clouds."""
+    reg = o3d.pipelines.registration
+    src = fc.pcd(i, P["odometry_depth_max"]).voxel_down_sample(P["icp_voxel"])
+    tgt = fc.pcd(j, P["odometry_depth_max"]).voxel_down_sample(P["icp_voxel"])
+    if len(src.points) < P["icp_min_points"] or len(tgt.points) < P["icp_min_points"]:
+        return 0.0, np.inf
+    ev = reg.evaluate_registration(src, tgt, P["icp_voxel"] * P["icp_eval_dist_scale"], T)
+    return float(ev.fitness), float(ev.inlier_rmse)
+
+
 def run_odometry(fc, kf, P, ckpt_path, o3d):
-    """Sequential odometry between consecutive keyframes with checkpointing."""
+    """Sequential odometry between consecutive keyframes with checkpointing.
+    status: 0 RGB-D odometry ok, 2 colored-ICP fallback ok, 1 failed -> constant-velocity extrapolation.
+    On resume, stored results are re-gated with the current thresholds and failures are recomputed."""
     n = len(kf) - 1
     trans = np.zeros((n, 4, 4))
     infos = np.zeros((n, 6, 6))
-    status = np.full(n, -1, int)  # -1 todo, 0 ok, 1 failed->extrapolated
+    status = np.full(n, -1, int)
+    fit = np.full(n, np.nan)  # verification fitness of accepted steps
     if ckpt_path.exists():
         z = np.load(ckpt_path)
         if len(z["status"]) == n and np.array_equal(z["kf"], kf):
             trans, infos, status = z["trans"].copy(), z["infos"].copy(), z["status"].copy()
-            print(f"[resume] odometry checkpoint: {int((status >= 0).sum())}/{n} pairs done")
+            if "fit" in z:
+                fit = z["fit"].copy()
+            for k in tqdm(range(n), desc="re-gate checkpoint"):
+                if status[k] == 1 or (status[k] == 0 and not step_ok(trans[k], infos[k], P)):
+                    status[k] = -1
+                elif status[k] == 0 and P["odometry_verify"]:
+                    if np.isnan(fit[k]):
+                        fit[k] = verify_step(fc, kf[k], kf[k + 1], trans[k], P, o3d)[0]
+                    if fit[k] < P["odometry_verify_fitness_min"]:
+                        status[k] = -1
+            print(f"[resume] odometry checkpoint: {int((status >= 0).sum())}/{n} pairs reusable")
         else:
             print("[resume] odometry checkpoint does not match keyframes, recomputing")
     t0, done0 = time.time(), int((status >= 0).sum())
@@ -104,28 +137,140 @@ def run_odometry(fc, kf, P, ckpt_path, o3d):
         if status[k] >= 0:
             continue
         i, j = kf[k], kf[k + 1]
-        v_prev = trans[k - 1] if k > 0 and status[k - 1] >= 0 else np.eye(4)
+        v_prev = fallback_step(trans, status, k, P)
         good = False
         vr = min(fc.valid_ratio(i, P["odometry_depth_max"]), fc.valid_ratio(j, P["odometry_depth_max"]))
         if vr >= P["odometry_min_valid_ratio"]:
             for init in (np.eye(4), v_prev):
                 ok, T, info = rgbd_odometry(fc, i, j, init, P, o3d)
                 if ok and step_ok(T, info, P):
-                    good = True
-                    break
+                    f = verify_step(fc, i, j, T, P, o3d)[0] if P["odometry_verify"] else 1.0
+                    if f >= P["odometry_verify_fitness_min"]:
+                        good = True
+                        fit[k] = f
+                        break
         if good:
             trans[k], infos[k], status[k] = T, info, 0
-        else:  # constant-velocity extrapolation, weak edge
-            trans[k], infos[k], status[k] = v_prev, np.eye(6) * P["odometry_fail_info_scale"], 1
+        else:
+            r = colored_icp(fc, i, j, v_prev, P, o3d) if P["odometry_icp_fallback"] else None
+            if r and r["fitness"] >= P["odometry_verify_fitness_min"] and r["rmse"] <= P["loop_rmse_max"] \
+                    and step_ok(r["T"], np.full((6, 6), np.inf), P):
+                trans[k], infos[k], status[k], fit[k] = r["T"], r["info"], 2, r["fitness"]
+            else:  # constant-velocity extrapolation, weak edge
+                trans[k], infos[k], status[k] = v_prev, np.eye(6) * P["odometry_fail_info_scale"], 1
         pbar.update(1)
         if (k + 1) % P["checkpoint_every"] == 0:
-            np.savez(ckpt_path, trans=trans, infos=infos, status=status, kf=kf)
+            np.savez(ckpt_path, trans=trans, infos=infos, status=status, kf=kf, fit=fit)
             el = time.time() - t0
             dn = int((status >= 0).sum()) - done0
             pbar.set_postfix(fail=int((status == 1).sum()), eta_s=int(el / max(dn, 1) * (n - k - 1)))
     pbar.close()
-    np.savez(ckpt_path, trans=trans, infos=infos, status=status, kf=kf)
+    np.savez(ckpt_path, trans=trans, infos=infos, status=status, kf=kf, fit=fit)
     return trans, infos, status
+
+
+# ----------------------------------------------------------------------------- ground-plane constraint
+def measure_ground(fc, i, up_cam, P):
+    """RANSAC ground plane in camera coordinates on the lower image part.
+    Returns (unit normal pointing up, camera height above plane) or None."""
+    import open3d as o3d
+    d = np.asarray(fc.rgbd(i, P["ground_max_depth"]).depth)  # metres, 0 = invalid
+    K = fc.intr.intrinsic_matrix
+    h, w = d.shape
+    s = P["ground_pixel_stride"]
+    r0 = int(h * P["ground_roi_top_frac"])
+    v, u = np.mgrid[r0:h:s, 0:w:s]
+    z = d[r0::s, ::s]
+    m = z > 0
+    if m.sum() < P["ground_min_points"]:
+        return None
+    pts = np.stack([(u[m] - K[0, 2]) * z[m] / K[0, 0], (v[m] - K[1, 2]) * z[m] / K[1, 1], z[m]], 1)
+    pc = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pts))
+    model, inl = pc.segment_plane(P["ground_ransac_dist"], 3, P["ground_ransac_iters"])
+    n = np.asarray(model[:3], float)
+    nn = np.linalg.norm(n)
+    n, dd = n / nn, model[3] / nn
+    if np.dot(n, up_cam) < 0:
+        n, dd = -n, -dd
+    if len(inl) < P["ground_min_inlier_frac"] * len(pts) or \
+            np.degrees(np.arccos(np.clip(np.dot(n, up_cam), -1, 1))) > P["ground_max_angle_deg"]:
+        return None
+    return n, float(dd)  # camera origin is at signed distance dd above the plane (n.x + dd = 0)
+
+
+def measure_ground_all(fc, kf, up_cam, P, ckpt_path):
+    if ckpt_path.exists():
+        z = np.load(ckpt_path)
+        if np.array_equal(z["kf"], kf):
+            return z["normals"], z["heights"], z["valid"]
+    normals = np.zeros((len(kf), 3))
+    heights = np.zeros(len(kf))
+    valid = np.zeros(len(kf), bool)
+    for k in tqdm(range(len(kf)), desc="ground planes"):
+        g = measure_ground(fc, kf[k], up_cam, P)
+        if g is not None:
+            normals[k], heights[k], valid[k] = g[0], g[1], True
+    np.savez(ckpt_path, normals=normals, heights=heights, valid=valid, kf=kf)
+    return normals, heights, valid
+
+
+def _smooth(values, valid, window):
+    """Windowed median over valid samples, nearest valid sample where the window is empty."""
+    idx = np.where(valid)[0]
+    out = np.zeros((len(valid),) + values.shape[1:])
+    half = window // 2
+    for k in range(len(valid)):
+        lo, hi = np.searchsorted(idx, k - half), np.searchsorted(idx, k + half, side="right")
+        sel = idx[lo:hi] if hi > lo else idx[[np.argmin(np.abs(idx - k))]]
+        out[k] = np.median(values[sel], axis=0)
+    return out
+
+
+def reject_outliers(values, valid, window, max_dev):
+    """Invalidate samples deviating more than max_dev from a long-window median."""
+    ref = _smooth(values, valid, window)
+    dev = np.linalg.norm((values - ref).reshape(len(values), -1), axis=1)
+    return valid & (dev <= max_dev)
+
+
+def tilt_residual_deg(Ts, normals, valid, up):
+    nw = np.einsum("nij,nj->ni", Ts[:, :3, :3], normals)
+    ang = np.degrees(np.arccos(np.clip(nw @ up, -1, 1)))[valid]
+    return {"median": float(np.median(ang)), "p90": float(np.percentile(ang, 90)), "max": float(ang.max())}
+
+
+def apply_ground_constraint(Ts, normals, heights, valid, up, P):
+    """Correct roll/pitch so the observed ground normal maps to `up`, re-integrate the translation
+    increments with the corrected rotations and (optionally) set the height along `up` from the
+    observed camera-to-ground distance. Yaw and horizontal position are left to odometry/loops."""
+    from scipy.spatial.transform import Rotation
+    if valid.sum() < P["ground_min_valid_frames"]:
+        print(f"[warn] ground constraint skipped: only {int(valid.sum())} frames with a ground plane")
+        return Ts, False
+    nw = np.einsum("nij,nj->ni", Ts[:, :3, :3], normals)
+    rv = np.zeros((len(Ts), 3))
+    for k in np.where(valid)[0]:
+        axis = np.cross(nw[k], up)
+        sn, c = np.linalg.norm(axis), float(np.dot(nw[k], up))
+        if sn > 1e-12:
+            rv[k] = axis / sn * np.arctan2(sn, c)
+    rvalid = reject_outliers(rv, valid, P["ground_outlier_window"], np.radians(P["ground_outlier_max_deg"]))
+    rv = _smooth(rv, rvalid, P["ground_smooth_window"])
+    C = Rotation.from_rotvec(rv).as_matrix()
+    out = Ts.copy()
+    p = Ts[:, :3, 3]
+    for k in range(len(Ts)):
+        out[k][:3, :3] = C[k] @ Ts[k][:3, :3]
+        if k > 0:
+            out[k][:3, 3] = out[k - 1][:3, 3] + C[k - 1] @ (p[k] - p[k - 1])
+    if P["ground_fix_height"]:
+        hvalid = reject_outliers(heights, valid, P["ground_outlier_window"], P["ground_outlier_max_height"])
+        h = _smooth(heights, hvalid, P["ground_smooth_window"])
+        ground_level = float(out[0][:3, 3] @ up) - h[0]  # keep the world origin at frame 0
+        for k in range(len(out)):
+            pk = out[k][:3, 3]
+            out[k][:3, 3] = pk - (pk @ up) * up + (ground_level + h[k]) * up
+    return out, True
 
 
 def chain(trans):
@@ -202,19 +347,36 @@ def loop_candidates(kf, stamps, poses, P):
     return sorted(cands), sorted(forced - cands)
 
 
-def run_open3d(cfg, fdir, rows, intr, out):
+def relative_edges(Ts):
+    """T_{k+1}_k from world poses."""
+    return np.array([np.linalg.inv(Ts[k + 1]) @ Ts[k] for k in range(len(Ts) - 1)])
+
+
+def run_open3d(cfg, fdir, rows, intr, out, T_w0, up):
+    """Poses in the world frame defined by T_w0 = T_world_optical(t0) (base_link at t0 or identity)."""
     import open3d as o3d
     P = cfg["poses"]
     fc = FrameCache(fdir, rows, intr, cfg)
     kf = np.arange(0, len(rows), P["keyframe_stride"])
     stamps = np.array([int(rows[i]["stamp_ns"]) for i in kf], np.int64)
     trans, infos, status = run_odometry(fc, kf, P, out / "ckpt_odometry.npz", o3d)
-    odo_poses = chain(trans)
+    odo_poses = np.einsum("ij,njk->nik", T_w0, chain(trans))
+    info = {}
+    init_poses = odo_poses
+    if P["ground_constraint"]:
+        up_cam = T_w0[:3, :3].T @ up  # camera "up" at t0, used as the expected ground normal direction
+        normals, heights, gvalid = measure_ground_all(fc, kf, up_cam, P, out / "ckpt_ground.npz")
+        info["ground_frames_valid"] = int(gvalid.sum())
+        info["tilt_residual_odometry_deg"] = tilt_residual_deg(odo_poses, normals, gvalid, up)
+        init_poses, applied = apply_ground_constraint(odo_poses, normals, heights, gvalid, up, P)
+        if applied:
+            info["tilt_residual_ground_corrected_deg"] = tilt_residual_deg(init_poses, normals, gvalid, up)
+    edges = relative_edges(init_poses)  # identical to `trans` when no ground constraint is applied
 
     # loop closure with checkpoint cache
     cache_path = out / "ckpt_loops.json"
     cache = json.load(open(cache_path)) if cache_path.exists() else {}
-    cands, forced = loop_candidates(kf, stamps, odo_poses, P)
+    cands, forced = loop_candidates(kf, stamps, init_poses, P)
     print(f"loop candidates: gated={len(cands)} forced head/tail={len(forced)} (cached {len(cache)})")
     accepted = []
     t0 = time.time()
@@ -222,7 +384,7 @@ def run_open3d(cfg, fdir, rows, intr, out):
     for n_done, ((b, a), is_forced) in enumerate(tqdm(todo, desc="loops")):
         key = f"{kf[b]}_{kf[a]}"
         if key not in cache:
-            est = np.linalg.inv(odo_poses[b]) @ odo_poses[a]  # T_b_a  (source a -> target b)
+            est = np.linalg.inv(init_poses[b]) @ init_poses[a]  # T_b_a  (source a -> target b)
             r = try_loop(fc, kf[a], kf[b], est, P, o3d)
             cache[key] = None if r is None else {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in r.items()}
             if (n_done + 1) % P["checkpoint_every"] == 0:
@@ -235,12 +397,12 @@ def run_open3d(cfg, fdir, rows, intr, out):
 
     reg = o3d.pipelines.registration
     pg = reg.PoseGraph()
-    for T in odo_poses:
+    for T in init_poses:
         pg.nodes.append(reg.PoseGraphNode(T))
-    for k in range(len(trans)):
-        pg.edges.append(reg.PoseGraphEdge(k, k + 1, trans[k], infos[k], uncertain=False))
-    for a, b, T, info, *_ in accepted:
-        pg.edges.append(reg.PoseGraphEdge(a, b, T, info, uncertain=True))
+    for k in range(len(edges)):
+        pg.edges.append(reg.PoseGraphEdge(k, k + 1, edges[k], infos[k], uncertain=False))
+    for a, b, T, inf, *_ in accepted:
+        pg.edges.append(reg.PoseGraphEdge(a, b, T, inf, uncertain=True))
     if accepted:
         opt = reg.GlobalOptimizationOption(
             max_correspondence_distance=P["pg_max_correspondence_distance"],
@@ -250,20 +412,24 @@ def run_open3d(cfg, fdir, rows, intr, out):
                                 reg.GlobalOptimizationConvergenceCriteria(), opt)
     o3d.io.write_pose_graph(str(out / "pose_graph.json"), pg)
     opt_poses = np.array([np.asarray(nd.pose) for nd in pg.nodes])
-    # normalise so node 0 is identity (reference node is fixed anyway)
-    opt_poses = np.einsum("ij,njk->nik", np.linalg.inv(opt_poses[0]), opt_poses)
+    if P["ground_constraint"] and P["ground_refine_after_pgo"] and "tilt_residual_ground_corrected_deg" in info:
+        info["tilt_residual_after_pgo_deg"] = tilt_residual_deg(opt_poses, normals, gvalid, up)
+        opt_poses, _ = apply_ground_constraint(opt_poses, normals, heights, gvalid, up, P)
+        info["tilt_residual_final_deg"] = tilt_residual_deg(opt_poses, normals, gvalid, up)
     n_loop_kept = sum(1 for e in pg.edges if e.uncertain)
-    info = {
+    info.update({
         "odometry_pairs": int(len(trans)),
         "odometry_failures": int((status == 1).sum()),
+        "odometry_icp_fallbacks": int((status == 2).sum()),
         "odometry_failure_indices": [int(kf[k]) for k in np.where(status == 1)[0]],
         "loop_candidates_gated": len(cands), "loop_candidates_forced": len(forced),
         "loop_edges_accepted": len(accepted), "loop_edges_forced_accepted": sum(1 for x in accepted if x[6]),
         "loop_edges_after_pruning": n_loop_kept,
         "loop_fitness": [round(x[4], 3) for x in accepted], "loop_rmse": [round(x[5], 4) for x in accepted],
-        "pre_optimization_head_tail_dist": float(np.linalg.norm(odo_poses[-1][:3, 3] - odo_poses[0][:3, 3])),
-    }
-    return kf, opt_poses, odo_poses, info
+        "odometry_only_head_tail_dist": float(np.linalg.norm(odo_poses[-1][:3, 3] - odo_poses[0][:3, 3])),
+        "pre_pgo_head_tail_dist": float(np.linalg.norm(init_poses[-1][:3, 3] - init_poses[0][:3, 3])),
+    })
+    return kf, opt_poses, odo_poses, init_poses, info
 
 
 # ----------------------------------------------------------------------------- outputs
@@ -344,18 +510,25 @@ def accumulated_preview(cfg, fdir, rows, intr, idx, Ts, out, up):
     a, b, la, lb = topdown_axes(up)
     upi = 2 if up == "+z" else 1
     sgn = 1 if up == "+z" else -1
-    fig, ax = plt.subplots(1, 3, figsize=(21, 7))
+    fig, ax = plt.subplots(1, 4, figsize=(28, 7))
     ax[0].scatter(Pn[:, a], Pn[:, b], s=0.1, c=C)
     ax[0].set_title("accumulated preview, top view (rgb)")
     ax[1].scatter(Pn[:, a], Pn[:, b], s=0.1, c=tt, cmap="jet")
     ax[1].set_title("top view, colored by time (blue=start, red=end)")
-    ax[2].scatter(Pn[:, a], sgn * Pn[:, upi], s=0.1, c=tt, cmap="jet")
-    ax[2].set_title("side view (horizontal vs up)")
-    for k in range(2):
+    # horizontal slice above the ground: objects (table, fence, trunks) must not appear doubled
+    hgt = sgn * Pn[:, upi]
+    g = np.percentile(hgt, P["preview_ground_percentile"]) if len(hgt) else 0.0
+    lo, hi = P["preview_slice_above_ground"]
+    s_ = (hgt > g + lo) & (hgt < g + hi)
+    ax[2].scatter(Pn[s_, a], Pn[s_, b], s=0.2, c=tt[s_], cmap="jet")
+    ax[2].set_title(f"slice {lo}-{hi} m above ground, by time (ghosting = doubled objects)")
+    ax[3].scatter(Pn[:, a], hgt, s=0.1, c=tt, cmap="jet")
+    ax[3].set_title("side view (horizontal vs up): ground must be one thin line")
+    for k in range(3):
         ax[k].set_xlabel(la), ax[k].set_ylabel(lb), ax[k].set_aspect("equal")
         if up == "-y":
             ax[k].invert_yaxis()
-    ax[2].set_xlabel(la), ax[2].set_ylabel("up"), ax[2].set_aspect("equal")
+    ax[3].set_xlabel(la), ax[3].set_ylabel("up"), ax[3].set_aspect("equal")
     fig.tight_layout()
     fig.savefig(out / "accumulated_preview.png", dpi=110)
     plt.close(fig)
@@ -410,15 +583,13 @@ def main():
         idx, Ts = poses_from_bag(cfg, rows, T_base_optical, times, Ts_ob)
         results["bag_tf"] = (idx, Ts, "odom", {"dropped_out_of_coverage": len(rows) - len(idx)})
     if src == "open3d" or P["compare_both"]:
-        kf, opt, odo, info = run_open3d(cfg, fdir, rows, intr, out)
-        if T_base_optical is not None:
-            world = "base_link_t0"
-            Ts = np.einsum("ij,njk->nik", T_base_optical, opt)
-            Ts_odo = np.einsum("ij,njk->nik", T_base_optical, odo)
-        else:
-            world, Ts, Ts_odo = "first_optical", opt, odo
+        world = "base_link_t0" if T_base_optical is not None else "first_optical"
+        T_w0 = T_base_optical if T_base_optical is not None else np.eye(4)
+        up_vec = {"+z": np.array([0, 0, 1.0]), "-y": np.array([0, -1.0, 0])}[up_axis_of(world)]
+        kf, Ts, Ts_odo, Ts_pre, info = run_open3d(cfg, fdir, rows, intr, out, T_w0, up_vec)
         results["open3d"] = (kf, Ts, world, info)
         results["open3d_odometry_only"] = (kf, Ts_odo, world, {})
+        results["open3d_pre_pgo"] = (kf, Ts_pre, world, {})
 
     idx, Ts, world, extra = results[src]
     for k, T in enumerate(Ts):
@@ -441,7 +612,9 @@ def main():
     report.update(extra)
     trajs = [(src, Ts, "b-")]
     if "open3d_odometry_only" in results and src == "open3d":
-        trajs.append(("odometry only (before PGO)", results["open3d_odometry_only"][1], "c--"))
+        trajs.append(("odometry only", results["open3d_odometry_only"][1], "c--"))
+        if P["ground_constraint"]:
+            trajs.append(("odometry + ground (before PGO)", results["open3d_pre_pgo"][1], "m:"))
     if len(results) > 1 and "bag_tf" in results and "open3d" in results:
         ib, Tb, *_ = results["bag_tf"]
         io_, To, *_ = results["open3d"]
