@@ -35,6 +35,9 @@ frames:
 
 typestore: ROS2_HUMBLE
 
+runtime:
+  omp_num_threads: 1           # OpenMP threads for Open3D (null = library default = all cores)
+
 inspect:
   sample_frame_index: 50       # which matched RGB-D pair to dump (clamped to available)
   allowed_depth_encodings: [16UC1, mono16, 32FC1]

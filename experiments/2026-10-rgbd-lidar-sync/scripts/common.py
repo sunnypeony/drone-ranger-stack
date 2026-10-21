@@ -27,7 +27,14 @@ def parse_args(description: str, extra=None) -> argparse.Namespace:
 
 def load_config(path: str | Path) -> dict:
     with open(path) as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+    # Must happen before the first `import open3d` (all scripts import it lazily, after this).
+    # Open3D's default OpenMP pool (one thread per core) makes RGB-D odometry ~9x slower on a
+    # 32-core host (2.2 s vs 0.24 s per pair); an explicit OMP_NUM_THREADS in the env wins.
+    n = cfg.get("runtime", {}).get("omp_num_threads")
+    if n:
+        os.environ.setdefault("OMP_NUM_THREADS", str(n))
+    return cfg
 
 
 def exp_path(p: str | Path) -> Path:
