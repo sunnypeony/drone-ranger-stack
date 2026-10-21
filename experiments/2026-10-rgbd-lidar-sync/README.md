@@ -122,6 +122,16 @@ depth_trunc = `extract.depth_max`（5 m）。
 **注意**：相机 stamp 是主机 `now()`，LiDAR 与相机之间的时间映射未标定，偏差属预期；
 此检查用于发现大错误（外参错、轴向镜像、尺度错），不是精度评估。
 
+### 辅助工具：首尾裁决与位姿评估
+- `scripts/check_head_tail.py` → `outputs/head_tail/`：**不依赖任何位姿**判断是否回到起点。
+  首段/尾段各取 5 帧，两两 FPFH + RANSAC（单位阵初值）+ 点到面 ICP；先去掉地平面（草地对绕法向的任意
+  偏航都能拟合，带地面时 fitness 无法区分 180° 翻转）。首段相机静止，所以每个尾帧有 5 次重复测量，
+  `per_tail_direct.spread_max_m` 就是它的可信度。另有对末尾 400 帧的扫描 `head_tail_sweep.png`。
+  RANSAC 在多线程下不可复现，噪声帧多次运行会差 0.2–0.3 m，只信 spread 小的结果。
+- `scripts/eval_poses.py [--poses name=path ...]` → `outputs/eval/compare.json`：对多套位姿算同一组指标。
+  只有 `head_tail_reference_error`（与上面免位姿测量的差）能看到全局漂移；相机高度/地面带对用了地面约束的
+  位姿天然有利；scan→mesh 用各自的网格且只取相机视场内的点，只反映局部一致性。
+
 ## 常见失败现象 → 原因
 
 | 现象 | 最可能原因 | 排查 |
