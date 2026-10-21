@@ -1,0 +1,53 @@
+# v3: v2 (ground-constrained visual odometry + SE(2) graph + 2D LiDAR) with
+#   - a hard time cutoff: the bag was cut by hand from a longer recording, its last frame is
+#     arbitrary and there is no "end == start" constraint;
+#   - loop closures ONLY from pose-free camera measurements (scripts/pf_loop_edges.py) with a
+#     held-out evaluation group; no v1 visual loops (they include forced head/tail pairs), no
+#     LiDAR loops (their candidates come from the pose estimate);
+#   - LiDAR contributes adjacent-keyframe x/y/yaw constraints only.
+# Inherits v2.yaml (-> default.yaml); only differences are listed here.
+base: v2.yaml
+
+cutoff_s: 175.0                    # s from frame 0; pose estimation, TSDF and evaluation stop here
+
+paths:
+  outputs_dir: outputs/v3
+  results_dir: results/v3
+
+lidar:
+  T_base_laser: [0.125, 0.0, 0.025, 0.0]   # measured; rotation identity verified with a pose-free virtual scan
+
+v2:
+  use_v1_visual_loops: false       # v1 loop cache contains forced head/tail pairs and outdoor repetitive-texture loops
+  drop_forced_head_tail: true      # if v1 loops are ever re-enabled, still drop the forced head/tail pairs
+  pf_loop_edges: outputs/v3/pf_loops/loop_edges.json
+  sigma_pf_loop_xy: 0.03           # m, ~ the 3 cm acceptance spread
+  sigma_pf_loop_deg: 1.0
+  variants:
+    _replace: true
+    base:  {blur_removal: false, pf_loops: false, lidar_adjacent: false, lidar_loops: false, audit_visual_loops: false}
+    blur:  {blur_removal: true,  pf_loops: false, lidar_adjacent: false, lidar_loops: false, audit_visual_loops: false}
+    pf:    {blur_removal: false, pf_loops: true,  lidar_adjacent: false, lidar_loops: false, audit_visual_loops: false}
+    lidar: {blur_removal: false, pf_loops: false, lidar_adjacent: true,  lidar_loops: false, audit_visual_loops: false}
+    full:  {blur_removal: true,  pf_loops: true,  lidar_adjacent: true,  lidar_loops: false, audit_visual_loops: false}
+    # not in the requested list: added after the first ablation showed LiDAR adjacent edges hurt every
+    # held-out metric while blur removal helps the local ones
+    pf_blur: {blur_removal: true, pf_loops: true, lidar_adjacent: false, lidar_loops: false, audit_visual_loops: false}
+  final_variant: pf_blur           # chosen from the held-out ablation (README v3), not assumed
+
+eval:
+  cutoff_s: 175.0                  # eval_poses.py: same cutoff for every pose set, v1 included
+  pose_sets:
+    _replace: true
+    v1:    outputs/poses/poses.npz
+    base:  outputs/v3/ablation/base/poses/poses.npz
+    blur:  outputs/v3/ablation/blur/poses/poses.npz
+    pf:    outputs/v3/ablation/pf/poses/poses.npz
+    lidar: outputs/v3/ablation/lidar/poses/poses.npz
+    full:  outputs/v3/ablation/full/poses/poses.npz
+    pf_blur: outputs/v3/ablation/pf_blur/poses/poses.npz
+  out_dir: eval
+  pf_loop_edges: outputs/v3/pf_loops/loop_edges.json   # held-out group = primary metric
+  heldout_scan_parity: 1           # 03b constrains with index % 2 == v2.constraint_parity (0); score the rest
+  segments:                        # extra slice-sharpness metric on frame ranges (extracted-frame indices)
+    f1850_2475: [1850, 2475]

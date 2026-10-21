@@ -1,0 +1,65 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Xform "Environment" (
+        prepend references = @../scene_collision.usdc@
+    )
+    {
+    }
+
+    def PhysicsScene "PhysicsScene"
+    {
+        vector3f physics:gravityDirection = (0, 0, -1)
+        float physics:gravityMagnitude = 9.81
+    }
+
+    def Cube "cube_table" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI", "PhysicsMassAPI"]
+    )
+    {
+        float3[] extent = [(-0.1, -0.1, -0.1), (0.1, 0.1, 0.1)]
+        float physics:mass = 1
+        color3f[] primvars:displayColor = [(0.9, 0.1, 0.1)]
+        double size = 0.2
+        double3 xformOp:translate = (3.008868436508663, 0.021316575984191132, 1.9771841025309076)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Cube "cube_table_edge" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI", "PhysicsMassAPI"]
+    )
+    {
+        float3[] extent = [(-0.1, -0.1, -0.1), (0.1, 0.1, 0.1)]
+        float physics:mass = 1
+        color3f[] primvars:displayColor = [(0.1, 0.4, 0.9)]
+        double size = 0.2
+        double3 xformOp:translate = (3.307015538238693, 0.021316575984191132, 1.8525925135569086)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Cube "cube_ground" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI", "PhysicsMassAPI"]
+    )
+    {
+        float3[] extent = [(-0.1, -0.1, -0.1), (0.1, 0.1, 0.1)]
+        float physics:mass = 1
+        color3f[] primvars:displayColor = [(0.1, 0.8, 0.2)]
+        double size = 0.2
+        double3 xformOp:translate = (4.5088684365086635, 0.021316575984191132, 1.040828511710595)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def DistantLight "DistantLight"
+    {
+        float inputs:intensity = 3000
+        float3 xformOp:rotateXYZ = (-45, 0, 30)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+}
+

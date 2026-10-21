@@ -1,0 +1,84 @@
+{
+  "pf_loop_edges_used": 3,
+  "pf_loop_edges_dropped_blurry": [],
+  "pf_residuals": [
+    {
+      "first": 0,
+      "frame": 2512,
+      "group": "constraint",
+      "ref_distance_m": 0.9209375869465783,
+      "translation_error_m": 0.11223817739696172,
+      "rotation_error_deg": 2.3693284964640253
+    },
+    {
+      "first": 0,
+      "frame": 2545,
+      "group": "eval",
+      "ref_distance_m": 0.5163702853262476,
+      "translation_error_m": 0.10996821692949743,
+      "rotation_error_deg": 2.235198388758619
+    },
+    {
+      "first": 0,
+      "frame": 2548,
+      "group": "constraint",
+      "ref_distance_m": 0.4900533688130811,
+      "translation_error_m": 0.10625358638606472,
+      "rotation_error_deg": 2.1969851417079767
+    },
+    {
+      "first": 0,
+      "frame": 2551,
+      "group": "eval",
+      "ref_distance_m": 0.4453687334463834,
+      "translation_error_m": 0.08236775830783861,
+      "rotation_error_deg": 2.200111035514405
+    },
+    {
+      "first": 0,
+      "frame": 2554,
+      "group": "eval",
+      "ref_distance_m": 0.420923498756358,
+      "translation_error_m": 0.06684892937022613,
+      "rotation_error_deg": 1.767119236423174
+    },
+    {
+      "first": 0,
+      "frame": 2557,
+      "group": "constraint",
+      "ref_distance_m": 0.41012716726890547,
+      "translation_error_m": 0.06813091687779242,
+      "rotation_error_deg": 1.6929715128957556
+    }
+  ],
+  "pf_residual_constraint_median_m": 0.10625358638606472,
+  "pf_residual_eval_median_m": 0.08236775830783861,
+  "pf_residual_2551_m": 0.08236775830783861,
+  "nodes": 2363,
+  "visual_odometry_edges": 2362,
+  "visual_loop_edges": 0,
+  "visual_loop_audit": null,
+  "flags": {
+    "blur_removal": true,
+    "pf_loops": true,
+    "lidar_adjacent": false,
+    "lidar_loops": false,
+    "audit_visual_loops": false
+  },
+  "lidar_adjacent_edges": 0,
+  "lidar_loop_edges": 0,
+  "lidar_loop_stats": null,
+  "head_tail_m": 0.7666461313069041,
+  "graph": {
+    "cost": 5.8560653364258295,
+    "nfev": 36,
+    "status": 2,
+    "graph_nodes": 238,
+    "whitened_residual_median_by_type": {
+      "pf_loop": 0.737391338711027,
+      "vis_odo": 0.14846005353465833
+    }
+  },
+  "path_length_m": 27.47135332918878,
+  "n_tsdf_frames": 2363
+}

@@ -1,0 +1,971 @@
+{
+  "metrics": {
+    "v1": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 31.03777453850811,
+      "head_tail_distance_m": 0.4316130468725869,
+      "head_tail_rotation_deg": 19.84561629733158,
+      "ground_normal_world": [
+        -0.0021916018828216856,
+        0.0016140253049361723,
+        0.9999962958948909
+      ],
+      "ground_tilt_deg": 0.15594785846628648,
+      "camera_height_m": {
+        "mean": 0.7822030980668879,
+        "std": 0.04266395104279336,
+        "min": 0.6553502476812302,
+        "max": 0.9069644683342251
+      },
+      "step_m": {
+        "median": 0.010313188786396588,
+        "p99": 0.05281582728435333,
+        "max": 0.2055877747473281
+      },
+      "ground_band_fraction": 0.19235799358480749,
+      "slice_occupied_cells": 8775,
+      "slice_occupied_area_m2": 21.937500000000004,
+      "n_cloud_points": 572703,
+      "mesh_triangles": 452968,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 0.44405498394462684,
+          "translation_error_m": 0.08976092753303921,
+          "rotation_pose_deg": 3.5261806457778753,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 0.16977185840920653,
+          "rotation_error_deg": 5.089439657103546
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 0.1107150283185085,
+          "rotation_error_deg": 2.4655513759299605
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 0.10799946858321464,
+          "rotation_error_deg": 2.3840973403025085
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 0.08365411681463161,
+          "rotation_error_deg": 2.3065768328194425
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 0.06647936247804356,
+          "rotation_error_deg": 1.797197426357424
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 0.06591862692824833,
+          "rotation_error_deg": 1.6110808546072253
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 0.10799946858321464,
+          "trans_max_m": 0.16977185840920653,
+          "rot_median_deg": 2.3840973403025085,
+          "rot_max_deg": 5.089439657103546
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 0.08365411681463161,
+          "trans_max_m": 0.1107150283185085,
+          "rot_median_deg": 2.3065768328194425,
+          "rot_max_deg": 2.4655513759299605
+        }
+      },
+      "pf_2551_error_m": 0.08365411681463161,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 208748,
+          "slice_occupied_cells": 4729,
+          "slice_points": 47716
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 0,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.08497628569602966,
+        "p90": 0.22643765807151794,
+        "frac_lt_0.1m": 0.5700655933214073
+      }
+    },
+    "base": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v3/ablation/base/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 28.793392909654784,
+      "head_tail_distance_m": 0.6166441846792862,
+      "head_tail_rotation_deg": 9.500570251935779,
+      "ground_normal_world": [
+        -0.005779069514141364,
+        -0.010205134168957661,
+        0.9999312264311703
+      ],
+      "ground_tilt_deg": 0.6719715713524917,
+      "camera_height_m": {
+        "mean": 0.7775835927342363,
+        "std": 0.05129224220713407,
+        "min": 0.6353411471540389,
+        "max": 0.8846618268695544
+      },
+      "step_m": {
+        "median": 0.01001927879711078,
+        "p99": 0.0493594177903054,
+        "max": 0.20535496747435686
+      },
+      "ground_band_fraction": 0.2056093403458758,
+      "slice_occupied_cells": 8903,
+      "slice_occupied_area_m2": 22.257500000000004,
+      "n_cloud_points": 576681,
+      "mesh_triangles": 464941,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 0.5822956509556351,
+          "translation_error_m": 0.4751820845400228,
+          "rotation_pose_deg": 17.083752982259117,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 0.3641839841682092,
+          "rotation_error_deg": 19.640046618677445
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 0.47403905595115575,
+          "rotation_error_deg": 18.987848743009508
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 0.4845114561723232,
+          "rotation_error_deg": 19.179818309441302
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 0.47084062352337064,
+          "rotation_error_deg": 19.052914973407077
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 0.47265887040053445,
+          "rotation_error_deg": 19.012811646997868
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 0.46767864733264497,
+          "rotation_error_deg": 18.53590997845261
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 0.46767864733264497,
+          "trans_max_m": 0.4845114561723232,
+          "rot_median_deg": 19.179818309441302,
+          "rot_max_deg": 19.640046618677445
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 0.47265887040053445,
+          "trans_max_m": 0.47403905595115575,
+          "rot_median_deg": 19.012811646997868,
+          "rot_max_deg": 19.052914973407077
+        }
+      },
+      "pf_2551_error_m": 0.47084062352337064,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 202371,
+          "slice_occupied_cells": 4925,
+          "slice_points": 45186
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 0,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.06762634217739105,
+        "p90": 0.21286915242671967,
+        "frac_lt_0.1m": 0.6487775790101371
+      }
+    },
+    "blur": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v3/ablation/blur/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 27.489529912011292,
+      "head_tail_distance_m": 2.1119293386344626,
+      "head_tail_rotation_deg": 21.95598764223655,
+      "ground_normal_world": [
+        0.0066022831146766185,
+        0.002363035048205633,
+        0.9999754126592487
+      ],
+      "ground_tilt_deg": 0.40178553760317903,
+      "camera_height_m": {
+        "mean": 0.7721489533922122,
+        "std": 0.04548577870726833,
+        "min": 0.6590009069436544,
+        "max": 0.9085217273833778
+      },
+      "step_m": {
+        "median": 0.009736323941642552,
+        "p99": 0.04153626998038488,
+        "max": 0.2053549664453838
+      },
+      "ground_band_fraction": 0.20196983489392806,
+      "slice_occupied_cells": 9806,
+      "slice_occupied_area_m2": 24.515000000000004,
+      "n_cloud_points": 591014,
+      "mesh_triangles": 456246,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 2.312340768409215,
+          "translation_error_m": 2.1307776921198345,
+          "rotation_pose_deg": 44.23921814862377,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 1.8005101489144075,
+          "rotation_error_deg": 47.01574888008967
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 2.09379961646636,
+          "rotation_error_deg": 46.27183344145896
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 2.117834548332559,
+          "rotation_error_deg": 46.45360565619098
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 2.128408446824114,
+          "rotation_error_deg": 46.31389625464215
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 2.142911868234388,
+          "rotation_error_deg": 46.30151117951789
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 2.142314567602057,
+          "rotation_error_deg": 45.82789948365381
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 2.117834548332559,
+          "trans_max_m": 2.142314567602057,
+          "rot_median_deg": 46.45360565619098,
+          "rot_max_deg": 47.01574888008967
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 2.128408446824114,
+          "trans_max_m": 2.142911868234388,
+          "rot_median_deg": 46.30151117951789,
+          "rot_max_deg": 46.31389625464215
+        }
+      },
+      "pf_2551_error_m": 2.128408446824114,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 180807,
+          "slice_occupied_cells": 4670,
+          "slice_points": 47427
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 263,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.059763580560684204,
+        "p90": 0.1827513724565506,
+        "frac_lt_0.1m": 0.6744186046511628
+      }
+    },
+    "pf": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v3/ablation/pf/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 28.79725592727688,
+      "head_tail_distance_m": 0.8240434093700987,
+      "head_tail_rotation_deg": 27.557261241458413,
+      "ground_normal_world": [
+        0.004862950255814973,
+        0.0035028712395960416,
+        0.9999820406426748
+      ],
+      "ground_tilt_deg": 0.34338686271316404,
+      "camera_height_m": {
+        "mean": 0.7582867376631678,
+        "std": 0.04441497314880681,
+        "min": 0.6430304765563641,
+        "max": 0.8926043405452406
+      },
+      "step_m": {
+        "median": 0.010015448466179515,
+        "p99": 0.04708085483813732,
+        "max": 0.20535526317601577
+      },
+      "ground_band_fraction": 0.21060965674224122,
+      "slice_occupied_cells": 8748,
+      "slice_occupied_area_m2": 21.870000000000005,
+      "n_cloud_points": 565843,
+      "mesh_triangles": 461219,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 0.46197871169603577,
+          "translation_error_m": 0.09171617591529661,
+          "rotation_pose_deg": 3.782749514957832,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 0.11201132475848632,
+          "rotation_error_deg": 2.308036967382078
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 0.1105433122035397,
+          "rotation_error_deg": 2.2752052588344855
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 0.10610099598371153,
+          "rotation_error_deg": 2.2735486336693924
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 0.0866064177919566,
+          "rotation_error_deg": 2.2764648789320585
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 0.07127173497879008,
+          "rotation_error_deg": 1.8223635176592683
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 0.06971788241878528,
+          "rotation_error_deg": 1.75361598658819
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 0.10610099598371153,
+          "trans_max_m": 0.11201132475848632,
+          "rot_median_deg": 2.2735486336693924,
+          "rot_max_deg": 2.308036967382078
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 0.0866064177919566,
+          "trans_max_m": 0.1105433122035397,
+          "rot_median_deg": 2.2752052588344855,
+          "rot_max_deg": 2.2764648789320585
+        }
+      },
+      "pf_2551_error_m": 0.0866064177919566,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 205946,
+          "slice_occupied_cells": 4848,
+          "slice_points": 44802
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 0,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.07327114045619965,
+        "p90": 0.2333795428276062,
+        "frac_lt_0.1m": 0.6189624329159212
+      }
+    },
+    "lidar": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v3/ablation/lidar/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 29.597584783449417,
+      "head_tail_distance_m": 0.4489749110027431,
+      "head_tail_rotation_deg": 5.146941761593858,
+      "ground_normal_world": [
+        0.007476796121391424,
+        0.004304732738438826,
+        0.9999627827053413
+      ],
+      "ground_tilt_deg": 0.494323637091884,
+      "camera_height_m": {
+        "mean": 0.7645924508400368,
+        "std": 0.041130567640614006,
+        "min": 0.6534957122526137,
+        "max": 0.9056759099267615
+      },
+      "step_m": {
+        "median": 0.010379624515714246,
+        "p99": 0.04907383590805118,
+        "max": 0.2053455874826526
+      },
+      "ground_band_fraction": 0.21465166792031845,
+      "slice_occupied_cells": 9728,
+      "slice_occupied_area_m2": 24.320000000000004,
+      "n_cloud_points": 591605,
+      "mesh_triangles": 466549,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 1.3216231907534883,
+          "translation_error_m": 1.0197987620884155,
+          "rotation_pose_deg": 24.75418038866136,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 0.8764058213159658,
+          "rotation_error_deg": 30.232029462192866
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 0.9950528982105217,
+          "rotation_error_deg": 27.88999702773581
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 1.0087927789199647,
+          "rotation_error_deg": 27.438659932729717
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 1.0180827374148118,
+          "rotation_error_deg": 26.778005313528627
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 1.023139370619768,
+          "rotation_error_deg": 26.441671735727606
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 1.005509839757818,
+          "rotation_error_deg": 25.65538559727376
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 1.005509839757818,
+          "trans_max_m": 1.0087927789199647,
+          "rot_median_deg": 27.438659932729717,
+          "rot_max_deg": 30.232029462192866
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 1.0180827374148118,
+          "trans_max_m": 1.023139370619768,
+          "rot_median_deg": 26.778005313528627,
+          "rot_max_deg": 27.88999702773581
+        }
+      },
+      "pf_2551_error_m": 1.0180827374148118,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 215491,
+          "slice_occupied_cells": 5040,
+          "slice_points": 46784
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 0,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.22888047993183136,
+        "p90": 0.31788384914398193,
+        "frac_lt_0.1m": 0.09540846750149076
+      }
+    },
+    "full": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v3/ablation/full/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 28.728582030433955,
+      "head_tail_distance_m": 0.9297696295850895,
+      "head_tail_rotation_deg": 31.889401500202354,
+      "ground_normal_world": [
+        0.010156891789912432,
+        -0.001307143329608475,
+        0.9999475630879271
+      ],
+      "ground_tilt_deg": 0.586756733861624,
+      "camera_height_m": {
+        "mean": 0.7648648495232155,
+        "std": 0.04754166900336495,
+        "min": 0.6566380834758594,
+        "max": 0.9053402643129091
+      },
+      "step_m": {
+        "median": 0.010239966744053457,
+        "p99": 0.04232054808801948,
+        "max": 0.20535351691851658
+      },
+      "ground_band_fraction": 0.21750016686547904,
+      "slice_occupied_cells": 9694,
+      "slice_occupied_area_m2": 24.235000000000003,
+      "n_cloud_points": 584303,
+      "mesh_triangles": 471318,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 0.4647448182922004,
+          "translation_error_m": 0.08881108088226018,
+          "rotation_pose_deg": 3.847853043499417,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 0.11513592436358201,
+          "rotation_error_deg": 2.565419853949031
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 0.10995361247074127,
+          "rotation_error_deg": 2.2380930427638304
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 0.10593428918235183,
+          "rotation_error_deg": 2.1848554319362874
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 0.08408530183094161,
+          "rotation_error_deg": 2.195597253606697
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 0.06956547688852392,
+          "rotation_error_deg": 1.755369009783251
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 0.09828994145010359,
+          "rotation_error_deg": 2.9714816879562944
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 0.10593428918235183,
+          "trans_max_m": 0.11513592436358201,
+          "rot_median_deg": 2.565419853949031,
+          "rot_max_deg": 2.9714816879562944
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 0.08408530183094161,
+          "trans_max_m": 0.10995361247074127,
+          "rot_median_deg": 2.195597253606697,
+          "rot_max_deg": 2.2380930427638304
+        }
+      },
+      "pf_2551_error_m": 0.08408530183094161,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 197288,
+          "slice_occupied_cells": 5127,
+          "slice_points": 45610
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 263,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.1671595424413681,
+        "p90": 0.2677111029624939,
+        "frac_lt_0.1m": 0.1800834824090638
+      }
+    },
+    "pf_blur": {
+      "path": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v3/ablation/pf_blur/poses/poses.npz",
+      "n_poses": 2626,
+      "path_length_m": 27.47135332918878,
+      "head_tail_distance_m": 0.7666461313069043,
+      "head_tail_rotation_deg": 24.80310145665902,
+      "ground_normal_world": [
+        0.009987729317312496,
+        0.009742446464689872,
+        0.9999026602624711
+      ],
+      "ground_tilt_deg": 0.799440670362334,
+      "camera_height_m": {
+        "mean": 0.7642299004083475,
+        "std": 0.04824754483883887,
+        "min": 0.6616404136584993,
+        "max": 0.910954735329444
+      },
+      "step_m": {
+        "median": 0.009713905622586345,
+        "p99": 0.04150889557188403,
+        "max": 0.20535607945879067
+      },
+      "ground_band_fraction": 0.19495440970669284,
+      "slice_occupied_cells": 8536,
+      "slice_occupied_area_m2": 21.340000000000003,
+      "n_cloud_points": 554504,
+      "mesh_triangles": 457427,
+      "head_tail_reference_error": [
+        {
+          "first": 0,
+          "tail": 2551,
+          "ref_distance_m": 0.448454504557858,
+          "pose_distance_m": 0.4602951659076752,
+          "translation_error_m": 0.08758083502162066,
+          "rotation_pose_deg": 3.73052938758737,
+          "rotation_ref_deg": 3.265243839029502
+        }
+      ],
+      "pf_loop_residuals": [
+        {
+          "first": 0,
+          "frame": 2512,
+          "group": "constraint",
+          "ref_distance_m": 0.9209375869465783,
+          "translation_error_m": 0.11223817739696172,
+          "rotation_error_deg": 2.3693284964640253
+        },
+        {
+          "first": 0,
+          "frame": 2545,
+          "group": "eval",
+          "ref_distance_m": 0.5163702853262476,
+          "translation_error_m": 0.10996821692949743,
+          "rotation_error_deg": 2.235198388758619
+        },
+        {
+          "first": 0,
+          "frame": 2548,
+          "group": "constraint",
+          "ref_distance_m": 0.4900533688130811,
+          "translation_error_m": 0.10625358638606472,
+          "rotation_error_deg": 2.1969851417079767
+        },
+        {
+          "first": 0,
+          "frame": 2551,
+          "group": "eval",
+          "ref_distance_m": 0.4453687334463834,
+          "translation_error_m": 0.08236775830783861,
+          "rotation_error_deg": 2.200111035514405
+        },
+        {
+          "first": 0,
+          "frame": 2554,
+          "group": "eval",
+          "ref_distance_m": 0.420923498756358,
+          "translation_error_m": 0.06684892937022613,
+          "rotation_error_deg": 1.767119236423174
+        },
+        {
+          "first": 0,
+          "frame": 2557,
+          "group": "constraint",
+          "ref_distance_m": 0.41012716726890547,
+          "translation_error_m": 0.06813091687779242,
+          "rotation_error_deg": 1.6929715128957556
+        }
+      ],
+      "pf_loop_summary": {
+        "constraint": {
+          "n": 3,
+          "trans_median_m": 0.10625358638606472,
+          "trans_max_m": 0.11223817739696172,
+          "rot_median_deg": 2.1969851417079767,
+          "rot_max_deg": 2.3693284964640253
+        },
+        "eval": {
+          "n": 3,
+          "trans_median_m": 0.08236775830783861,
+          "trans_max_m": 0.10996821692949743,
+          "rot_median_deg": 2.200111035514405,
+          "rot_max_deg": 2.235198388758619
+        }
+      },
+      "pf_2551_error_m": 0.08236775830783861,
+      "segments": {
+        "f1850_2475": {
+          "frames": [
+            1850,
+            2475
+          ],
+          "n_points": 187490,
+          "slice_occupied_cells": 4525,
+          "slice_points": 46668
+        }
+      },
+      "n_frames_used": 2626,
+      "n_frames_masked": 263,
+      "scan_to_mesh_m": {
+        "n_scans": 172,
+        "n_points": 1677,
+        "median": 0.06409481167793274,
+        "p90": 0.21094706654548645,
+        "frac_lt_0.1m": 0.6434108527131783
+      }
+    }
+  },
+  "T_base_laser": [
+    [
+      1.0,
+      -0.0,
+      0.0,
+      0.125
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.025
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "params": {
+    "out_dir": "eval",
+    "cloud_every": 10,
+    "cloud_voxel": 0.03,
+    "depth_max": 4.0,
+    "ground_dist": 0.05,
+    "ground_ransac_iters": 2000,
+    "ground_max_tilt_deg": 30.0,
+    "ground_max_tries": 5,
+    "slice": [
+      0.4,
+      1.2
+    ],
+    "slice_grid": 0.05,
+    "mesh_voxel": 0.03,
+    "mesh_sdf_trunc": 0.12,
+    "mesh_frame_stride": 2,
+    "scan_stride": 5,
+    "scan_range_max": 4.0,
+    "scan_camera_fov_only": true,
+    "scan_fov_margin_deg": 0.0,
+    "head_tail_reference": "outputs/head_tail/head_tail.json",
+    "ref_max_spread_m": 0.08,
+    "ref_max_rot_range_deg": 3.0,
+    "slice_band": [
+      0.4,
+      1.2
+    ],
+    "frame_every": 10,
+    "compare_range_max": 4.0,
+    "crisp_scan_stride": 2,
+    "crisp_point_stride": 7,
+    "crisp_radius": 0.5,
+    "crisp_min_gap_s": 20.0,
+    "table_check_radius": 0.7,
+    "table_check_band": [
+      0.5,
+      1.1
+    ],
+    "closure_csm_xy_range": 2.0,
+    "closure_csm_yaw_range_deg": 45.0,
+    "extra_voxel": 0.015,
+    "cutoff_s": 175.0,
+    "pf_loop_edges": "outputs/v3/pf_loops/loop_edges.json",
+    "heldout_scan_parity": 1,
+    "segments": {
+      "f1850_2475": [
+        1850,
+        2475
+      ]
+    }
+  }
+}

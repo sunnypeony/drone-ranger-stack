@@ -9,6 +9,11 @@ For each pose set (config eval.pose_sets, or --poses name=path ...):
   - /scan -> mesh distance (median / p90) for returns within scan_range_max, against a coarse
     TSDF mesh built from the same poses (time mapping LiDAR<->camera is uncalibrated)
 
+Optional (v3): `cutoff_s` (only frames up to it), `tsdf_mask` in poses.npz (masked frames are not
+used for clouds / meshes), `heldout_scan_parity` (only scans 03b did not use as constraints),
+`pf_loop_edges` (residuals of the pose-free loop edges, per constraint / eval group) and
+`segments` (slice occupancy of the cloud built only from a frame range).
+
 Writes outputs/eval/{compare.json, slices.png}.
 """
 import matplotlib
@@ -46,9 +51,10 @@ def rgbd(o3d, fdir, row, cfg, E):
         depth_scale=cfg["tsdf"]["depth_scale"], depth_trunc=E["depth_max"], convert_rgb_to_intensity=False)
 
 
-def accumulated_cloud(o3d, fdir, rows, intr, idx, Ts, cfg, E):
+def accumulated_cloud(o3d, fdir, rows, intr, idx, Ts, cfg, E, use=None):
     acc = o3d.geometry.PointCloud()
-    for k in tqdm(range(0, len(idx), E["cloud_every"]), desc="  cloud", leave=False):
+    ks = [k for k in range(0, len(idx), E["cloud_every"]) if use is None or use[k]]
+    for k in tqdm(ks, desc="  cloud", leave=False):
         p = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd(o3d, fdir, rows[idx[k]], cfg, E), intr)
         acc += p.voxel_down_sample(E["cloud_voxel"]).transform(Ts[k])
     return acc.voxel_down_sample(E["cloud_voxel"])
@@ -69,11 +75,11 @@ def find_ground(pcd, E):
     return None, None, 0.0
 
 
-def build_mesh(o3d, fdir, rows, intr, idx, Ts, cfg, E):
+def build_mesh(o3d, fdir, rows, intr, idx, Ts, cfg, E, use):
     vol = o3d.pipelines.integration.ScalableTSDFVolume(
         voxel_length=E["mesh_voxel"], sdf_trunc=E["mesh_sdf_trunc"],
         color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
-    for k in tqdm(range(0, len(idx), E["mesh_frame_stride"]), desc="  tsdf", leave=False):
+    for k in tqdm([k for k in range(0, len(idx), E["mesh_frame_stride"]) if use[k]], desc="  tsdf", leave=False):
         vol.integrate(rgbd(o3d, fdir, rows[idx[k]], cfg, E), intr, np.linalg.inv(Ts[k]))
     return vol.extract_triangle_mesh()
 
@@ -91,8 +97,13 @@ def scan_points(cfg, E, intr):
         T_bl = T_base_laser_from_cfg(cfg, st)  # fixed lidar.T_base_laser if configured, else /tf_static
         T_ol = np.linalg.inv(T_bo) @ T_bl
         half = np.degrees(np.arctan2(intr["width"] / 2, np.array(intr["K"])[0][0])) - E["scan_fov_margin_deg"]
+        par = E.get("heldout_scan_parity")
+        n_kept = 0
         for i, (_, msg) in enumerate(iter_topic(reader, ts, cfg["topics"]["scan"])):
-            if i % E["scan_stride"]:
+            if par is not None and i % 2 != par:
+                continue
+            n_kept += 1
+            if (n_kept - 1) % E["scan_stride"]:
                 continue
             r = np.asarray(msg.ranges, dtype=float)
             a = msg.angle_min + np.arange(len(r)) * msg.angle_increment
@@ -104,6 +115,18 @@ def scan_points(cfg, E, intr):
                 pl = pl[(po[:, 2] > 0) & (np.degrees(np.abs(np.arctan2(po[:, 0], po[:, 2]))) <= half)]
             out.append((stamp_ns(msg.header), pl))
     return out, T_ol, T_bl
+
+
+def load_pf_edges(E):
+    """[(first, frame, T_first_frame, group)] accepted pose-free loop edges (pf_loop_edges.py)."""
+    import json
+    if not E.get("pf_loop_edges"):
+        return []
+    f = exp_path(E["pf_loop_edges"])
+    if not f.exists():
+        die(f"{f} not found; run pf_loop_edges.py")
+    return [(e["first"], e["frame"], np.array(e["T_first_frame"]), e["group"])
+            for e in json.load(open(f))["edges"] if e["accepted"]]
 
 
 def load_references(E):
@@ -122,14 +145,19 @@ def load_references(E):
     return refs
 
 
-def evaluate(name, path, cfg, E, frames, scans, T_ol, refs):
+def evaluate(name, path, cfg, E, frames, scans, T_ol, refs, pf):
     import open3d as o3d
     fdir, rows, intr_d = frames
     intr = o3d_intrinsic(intr_d)
     z = np.load(path, allow_pickle=True)
     Ts, idx, st = z["T_world_optical"], z["frame_idx"].astype(int), z["stamp_ns"].astype(np.int64)
-    print(f"[{name}] {path}: {len(Ts)} poses")
-    pcd = accumulated_cloud(o3d, fdir, rows, intr, idx, Ts, cfg, E)
+    use = z["tsdf_mask"].astype(bool) if "tsdf_mask" in z.files else np.ones(len(idx), bool)
+    n_all = len(Ts)
+    if E.get("cutoff_s") is not None:
+        keep = (st - int(rows[0]["stamp_ns"])) / 1e9 <= E["cutoff_s"]
+        Ts, idx, st, use = Ts[keep], idx[keep], st[keep], use[keep]
+    print(f"[{name}] {path}: {n_all} poses, {len(Ts)} within cutoff, {int((~use).sum())} masked from clouds/meshes")
+    pcd = accumulated_cloud(o3d, fdir, rows, intr, idx, Ts, cfg, E, use)
     A, n, ground_frac = find_ground(pcd, E)
     if A is None:
         die(f"[{name}] no ground plane within {E['ground_max_tilt_deg']} deg of +Z")
@@ -140,7 +168,17 @@ def evaluate(name, path, cfg, E, frames, scans, T_ol, refs):
     sl = P[(P[:, 2] >= lo) & (P[:, 2] <= hi)]
     cells = np.unique(np.floor(sl[:, :2] / E["slice_grid"]).astype(np.int64), axis=0)
 
-    mesh = build_mesh(o3d, fdir, rows, intr, idx, Ts, cfg, E)
+    seg = {}
+    for sname, (f0, f1) in (E.get("segments") or {}).items():
+        sel = use & (idx >= f0) & (idx <= f1)
+        sp = np.asarray(accumulated_cloud(o3d, fdir, rows, intr, idx, Ts, cfg, E, sel).points)
+        sp = sp @ A[:3, :3].T + A[:3, 3]
+        ss = sp[(sp[:, 2] >= lo) & (sp[:, 2] <= hi)]
+        seg[sname] = {"frames": [f0, f1], "n_points": len(sp),
+                      "slice_occupied_cells": int(len(np.unique(np.floor(ss[:, :2] / E["slice_grid"]).astype(np.int64),
+                                                                axis=0))),
+                      "slice_points": len(ss)}
+    mesh = build_mesh(o3d, fdir, rows, intr, idx, Ts, cfg, E, use)
     scene = o3d.t.geometry.RaycastingScene()
     scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(mesh))
     gap = int(cfg["poses"]["tf_interp_max_gap_s"] * 1e9)
@@ -157,6 +195,21 @@ def evaluate(name, path, cfg, E, frames, scans, T_ol, refs):
     dist = scene.compute_distance(o3d.core.Tensor(W)).numpy()
     rel = np.linalg.inv(Ts[0]) @ Ts[-1]
     pos = {f: k for k, f in enumerate(idx)}
+    pf_err = []
+    for a, b, T_ref, g in pf:
+        if a in pos and b in pos:
+            T = np.linalg.inv(Ts[pos[a]]) @ Ts[pos[b]]
+            pf_err.append({"first": a, "frame": b, "group": g, "ref_distance_m": float(np.linalg.norm(T_ref[:3, 3])),
+                           "translation_error_m": float(np.linalg.norm(T[:3, 3] - T_ref[:3, 3])),
+                           "rotation_error_deg": rot_angle_deg(T_ref[:3, :3].T @ T[:3, :3])})
+    pf_sum = {}
+    for g in ("constraint", "eval"):
+        e = [x for x in pf_err if x["group"] == g]
+        if e:
+            t = np.array([x["translation_error_m"] for x in e])
+            r = np.array([x["rotation_error_deg"] for x in e])
+            pf_sum[g] = {"n": len(e), "trans_median_m": float(np.median(t)), "trans_max_m": float(t.max()),
+                         "rot_median_deg": float(np.median(r)), "rot_max_deg": float(r.max())}
     ref_err = []
     for a, b, t_ref, r_ref in refs:
         if a in pos and b in pos:
@@ -181,6 +234,10 @@ def evaluate(name, path, cfg, E, frames, scans, T_ol, refs):
         "n_cloud_points": len(P),
         "mesh_triangles": len(mesh.triangles),
         "head_tail_reference_error": ref_err,
+        "pf_loop_residuals": pf_err, "pf_loop_summary": pf_sum,
+        "pf_2551_error_m": next((x["translation_error_m"] for x in pf_err if x["frame"] == 2551), None),
+        "segments": seg,
+        "n_frames_used": len(Ts), "n_frames_masked": int((~use).sum()),
         "scan_to_mesh_m": {"n_scans": n_used, "n_points": len(W), "median": float(np.median(dist)),
                            "p90": float(np.percentile(dist, 90)), "frac_lt_0.1m": float((dist < 0.1).mean())},
     }
@@ -202,10 +259,13 @@ def main():
     print(f"scans: {len(scans)} used (stride {E['scan_stride']}), T_base_laser t = {np.round(T_bl[:3, 3], 4).tolist()}")
 
     refs = load_references(E)
+    pf = load_pf_edges(E)
+    print(f"pose-free loop edges: {sum(g == 'constraint' for *_, g in pf)} constraint, "
+          f"{sum(g == 'eval' for *_, g in pf)} eval")
     print(f"pose-free references: {[(a, b, round(float(np.linalg.norm(t)), 3)) for a, b, t, _ in refs]}")
     results, slices = {}, {}
     for name, path in sets.items():
-        results[name], sl, cam = evaluate(name, path, cfg, E, frames, scans, T_ol, refs)
+        results[name], sl, cam = evaluate(name, path, cfg, E, frames, scans, T_ol, refs, pf)
         slices[name] = (sl, cam)
     write_json(out / "compare.json", {"metrics": results, "T_base_laser": T_bl,
                                       "params": {k: E[k] for k in E if k != "pose_sets"}})
@@ -227,7 +287,16 @@ def main():
     fig.savefig(out / "slices.png", dpi=110, facecolor=SURFACE)
     plt.close(fig)
 
-    rows = [("camera height std [m]", lambda r: r["camera_height_m"]["std"]),
+    def pfg(g, k):
+        return lambda r: r["pf_loop_summary"].get(g, {}).get(k, float("nan"))
+    rows = [("pf EVAL trans median [m]", pfg("eval", "trans_median_m")),
+            ("pf EVAL trans max [m]", pfg("eval", "trans_max_m")),
+            ("pf EVAL rot median [deg]", pfg("eval", "rot_median_deg")),
+            ("pf 0->2551 error [m]", lambda r: r["pf_2551_error_m"] if r["pf_2551_error_m"] is not None else float("nan")),
+            ("pf constraint trans median [m]", pfg("constraint", "trans_median_m")),
+            *[(f"slice cells {k}", (lambda k: lambda r: r["segments"][k]["slice_occupied_cells"])(k))
+              for k in (E.get("segments") or {})],
+            ("camera height std [m]", lambda r: r["camera_height_m"]["std"]),
             ("camera height min / max [m]", lambda r: f"{r['camera_height_m']['min']:.2f} / {r['camera_height_m']['max']:.2f}"),
             ("step median [m]", lambda r: r["step_m"]["median"]),
             ("step p99 [m]", lambda r: r["step_m"]["p99"]),

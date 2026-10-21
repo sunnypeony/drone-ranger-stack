@@ -32,6 +32,19 @@ def cube_positions(mesh, traj_xy, T):
     c = np.array(tab["center"])
     top = V[:, 2].max() + 1.0
     hc = raycast_down(scene, c, top)
+    c_drop, moved = c, False
+    lo, hi = T["table_band"]
+    if hc is None or not lo <= hc <= hi:
+        # hole in the table top at the centre (inconsistent views carve the TSDF): drop the table cube
+        # on the nearest grid point whose first hit is inside the table band, and record that it moved
+        g = np.arange(-tab["radius"], tab["radius"] + 1e-9, 0.02)
+        cand = sorted((float(np.hypot(dx, dy)), dx, dy) for dx in g for dy in g if np.hypot(dx, dy) <= tab["radius"])
+        for _, dx, dy in cand:
+            h = raycast_down(scene, c + [dx, dy], top)
+            if h is not None and lo <= h <= hi:
+                c_drop, hc, moved = c + np.array([dx, dy]), h, True
+                break
+    tab["table_cube_moved_off_centre_m"] = float(np.linalg.norm(c_drop - c)) if moved else 0.0
     # table edge: the direction whose edge point still hits something elevated
     edge, he = None, None
     for ang in np.linspace(0, 2 * np.pi, 16, endpoint=False):
@@ -55,7 +68,7 @@ def cube_positions(mesh, traj_xy, T):
         raise SystemExit("no open ground found around the table")
     d = T["drop_height"]
     cubes = {
-        "cube_table": [*c, (hc if hc is not None else tab["top_z"]) + d],
+        "cube_table": [*c_drop, (hc if hc is not None else tab["top_z"]) + d],
         "cube_table_edge": [*edge, (he if he is not None else tab["top_z"]) + d],
         "cube_ground": [*ground, hg + d],
     }
@@ -108,7 +121,7 @@ def main():
     v2_out = exp_path(cfg["paths"]["outputs_dir"])
     v1_usd = exp_path("results") / cfg["usd"]["filename"]
     jobs = {
-        "v2": (v2_out, res / "test_drop.usda", res / cfg["usd"]["filename"]),
+        res.name: (v2_out, res / "test_drop.usda", res / cfg["usd"]["filename"]),  # "v2" / "v3"
         "v1": (v1_out, res / "test_drop_v1.usda", v1_usd),
     }
     rep = {}

@@ -35,8 +35,15 @@ frames:
 
 typestore: ROS2_HUMBLE
 
+# Frames after this many seconds from the first frame are ignored by pose estimation, TSDF and
+# evaluation (null = use all). The bag was cut by hand from a longer recording.
+cutoff_s: null
+
 runtime:
-  omp_num_threads: 1           # OpenMP threads for Open3D (null = library default = all cores)
+  omp_num_threads: null        # OpenMP threads for Open3D (null = library default = all cores)
+  omp_threads_by_script:       # per-script override (stem of the script name)
+    03_estimate_poses: 1       # RGB-D odometry: 0.24 s/pair at 1 thread vs 2.2 s at 32
+    03b_lidar_refine: 1
 
 inspect:
   sample_frame_index: 50       # which matched RGB-D pair to dump (clamped to available)
@@ -212,6 +219,16 @@ lidar:
   plot_extent_margin: 1.0
   max_points_plot: 200000
 
+pf_loops:                      # scripts/pf_loop_edges.py: pose-free loop edges (camera, static head)
+  window_s: [160.0, 175.0]     # candidate tail frames, seconds from frame 0 (clipped to cutoff_s)
+  stride: 3                    # extracted frames between candidates
+  include_frames: [2551]       # always tested
+  max_spread_m: 0.03           # the 5 head-chained estimates must agree within this ...
+  max_spread_deg: 1.0          # ... and this (max deviation from their medoid)
+  max_rot_deg: 45.0            # larger relative rotation = views do not overlap
+  fixed_eval_frames: [2551]    # always in the held-out evaluation group
+  first_group: constraint      # alternation start for the remaining accepted edges
+
 eval:                          # scripts/eval_poses.py: same metrics for every pose set
   pose_sets:                   # name -> poses.npz (T_world_optical, frame_idx, stamp_ns)
     cloud_v1: outputs/poses/poses.npz
@@ -241,3 +258,8 @@ eval:                          # scripts/eval_poses.py: same metrics for every p
   head_tail_reference: outputs/head_tail/head_tail.json
   ref_max_spread_m: 0.08
   ref_max_rot_range_deg: 3.0
+
+table_check:                   # scripts/table_check.py: ray-cast coverage of the table top
+  coverage_radius_frac: 0.7    # disk of this fraction of the detected table radius
+  grid: 0.02                   # m between rays
+  map_half_width: 1.0          # m, height-map window for the figure

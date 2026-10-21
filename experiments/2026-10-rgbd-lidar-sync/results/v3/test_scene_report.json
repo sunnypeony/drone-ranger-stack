@@ -1,0 +1,96 @@
+{
+  "v3": {
+    "file": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/results/v3/test_drop.usda",
+    "reference": "scene_collision.usdc",
+    "table": {
+      "center": [
+        3.0919942159055953,
+        0.16358829558005483
+      ],
+      "radius": 0.5965667487535994,
+      "top_z": 1.0284660679815256,
+      "points": 1094,
+      "table_cube_moved_off_centre_m": 0.016918758180959545
+    },
+    "cubes": {
+      "cube_table": [
+        3.0954274671519966,
+        0.14702154682645596,
+        1.886723170705734
+      ],
+      "cube_table_edge": [
+        2.5408384069553414,
+        -0.06470791546785465,
+        2.034400353856979
+      ],
+      "cube_ground": [
+        4.591994215905595,
+        0.16358829558005483,
+        1.0222019056758267
+      ]
+    },
+    "surface_z_below_cube": {
+      "cube_table": 0.8867231707057339,
+      "cube_table_edge": 1.034400353856979,
+      "cube_ground": 0.022201905675826694
+    },
+    "prims": [
+      "/World",
+      "/World/Environment",
+      "/World/Environment/Scene",
+      "/World/Environment/Scene/mesh",
+      "/World/PhysicsScene",
+      "/World/cube_table",
+      "/World/cube_table_edge",
+      "/World/cube_ground",
+      "/World/DistantLight"
+    ]
+  },
+  "v1": {
+    "file": "/home/natasha/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/results/v3/test_drop_v1.usda",
+    "reference": "../scene_collision.usdc",
+    "table": {
+      "center": [
+        3.008868436508663,
+        0.021316575984191132
+      ],
+      "radius": 0.29814710173002995,
+      "top_z": 0.9903756860064693,
+      "points": 253,
+      "table_cube_moved_off_centre_m": 0.0
+    },
+    "cubes": {
+      "cube_table": [
+        3.008868436508663,
+        0.021316575984191132,
+        1.9771841025309076
+      ],
+      "cube_table_edge": [
+        3.307015538238693,
+        0.021316575984191132,
+        1.8525925135569086
+      ],
+      "cube_ground": [
+        4.5088684365086635,
+        0.021316575984191132,
+        1.040828511710595
+      ]
+    },
+    "surface_z_below_cube": {
+      "cube_table": 0.9771841025309076,
+      "cube_table_edge": 0.8525925135569086,
+      "cube_ground": 0.040828511710595095
+    },
+    "prims": [
+      "/World",
+      "/World/Environment",
+      "/World/Environment/Scene",
+      "/World/Environment/Scene/mesh",
+      "/World/PhysicsScene",
+      "/World/cube_table",
+      "/World/cube_table_edge",
+      "/World/cube_ground",
+      "/World/DistantLight"
+    ]
+  }
+}

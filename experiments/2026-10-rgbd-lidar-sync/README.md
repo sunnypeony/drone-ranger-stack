@@ -2,12 +2,17 @@
 
 > v1：RGB-D 视觉 odometry + 地面约束 + Open3D 位姿图（下文前半部分，结果在 `results/`）。
 > v2：在 v1 之上加入 2D LiDAR 约束（x/y/yaw），结果在 `results/v2/`，见文末 **v2** 一章。
+> v3：时间截止 175 s + 仅用免位姿回环（留出评估）+ 模糊剔除，结果在 `results/v3/`，见文末 **v3** 一章。
 
 手持 OAK-D（RGB + 设备端对齐深度）+ YDLIDAR T-mini Plus，在户外院子绕一张桌子走一圈（约 3 min）录制的
 ROS 2 Humble rosbag，离线重建为三角网格，并导出 Isaac Sim 可直接使用的静态碰撞 USD。
 不依赖 ROS / Isaac Sim 安装（`rosbags` 纯 Python 读 bag，`usd-core` 写 USD）。
 
 数据：Hugging Face dataset `danyangh/static_table_rgbd_2dlaserscan_rosbag_3min`（`backyard_rosbag_001.tar.gz`）。
+
+**数据说明（截取）**：这个 bag 是从一段更长的录制中**手动截取**的，末帧时刻是任意的，不代表实验结束，
+也**不存在“首尾应闭合”的约束**。v1/v2 的强制首尾回环和“首尾距离”指标都不应再作为正确性依据。
+v3 起位姿估计、TSDF 和评估只用前 `cutoff_s = 175.0` s（`configs/v3.yaml`），回环只来自免位姿测量。
 
 ## 流水线
 
@@ -353,3 +358,70 @@ TSDF 把它掏空。
 `test_drop_v1.usda`、`report.json`（消融表 + 全部诊断）、`pose_report.json`、`trajectory_topdown.png`、
 `trajectory_comparison.png`、`slice_v1_vs_v2.png`、`slice_ablation.png`、`lidar_overlay_v1_vs_v2.png`、
 `lidar_vs_mesh.png`（07）、`lidar_calib.png`、`table_region_voxel.png`。均 < 90 MB。
+
+
+---
+
+# v3：时间截止 + 免位姿回环（`configs/v3.yaml`，`./run_v3.sh`）
+
+```
+pf_loop_edges（免位姿回环边，约束组 / 评估组） → 03b（消融：base/blur/pf/lidar/full/pf_blur）
+  → eval_poses（同一套留出指标，含 v1） → 04 → 05 → 06 → 07 → 09（results/v3/test_drop.usda）
+```
+`configs/v3.yaml` 以 `base: v2.yaml` 继承，只写差异；`variants` / `pose_sets` 用 `_replace: true` 整体替换继承值。
+
+## 做了什么
+- **截止**：`cutoff_s: 175.0`，帧 0–2625（共 2626 帧）；scan 先按全序列索引分奇偶，再截止（评估与约束用同一索引）。
+- **删除首尾强制约束**：v3 不使用 v1 的视觉回环（`use_v1_visual_loops: false`，其中含强制首尾对和户外重复纹理误匹配），
+  不使用 LiDAR 回环（候选来自位姿估计，不是免位姿的）；`drop_forced_head_tail: true` 作为保险。
+- **免位姿回环边**（`scripts/pf_loop_edges.py`）：160–175 s 每 3 帧一个候选（+ 第 2551 帧），对 5 个静止首帧
+  各做一次去地面 FPFH+RANSAC+ICP，经首段内部链接换算成 `T_0_t` 的 5 个独立估计；**离散度 ≤ 3 cm / 1°** 才接受。
+  75 个候选接受 **6 条**（全在 167.4–170.4 s；170.4–175 s 的都没达到离散度要求，没有加）。
+  按帧号交替分组，2551 固定在评估组：约束组 2512 / 2548 / 2557，评估组 2545 / **2551** / 2554。
+  **局限**：评估组和约束组在时间上只差 0.2 s，评估组不是强独立的（满足 2548/2557 几乎就满足 2551）。
+- **模糊**：Laplacian 方差 < 全序列 10 分位（1520）→ 263 帧，位姿插值，不进 TSDF（`tsdf_mask`）。
+- **LiDAR**：外参固定 (0.125, 0, 0.025)、旋转单位阵；time_offset 网格搜索单峰清晰 → 采用 **+0.06 s**（v2 为 +0.10 s）；
+  yaw 无清晰峰，保持 0。只加相邻关键帧 x/y/yaw 边（73 关键帧，接受 68）。
+- **OpenMP 线程按脚本设置**（`runtime.omp_threads_by_script`）：此前全局 1 线程的修复让 TSDF 积分从 1/60 s 变成 2.4 s 每帧；
+  现在只有 03 / 03b 用 1 线程。
+
+## 消融（0–175 s，留出指标；`results/v3/compare.json`、`table_check.json`）
+
+| 变体 | 评估组残差 中位 [m] / [°] | 0→2551 [m] | 约束组残差 [m] | 留出 scan→mesh（视场内）中位 / p90 [m] | 切片格子 1850–2475 | 切片格子 全程 | 桌子半径 [m] / 桌面覆盖 |
+|---|---|---|---|---|---|---|---|
+| v1（云端 Open3D 6DoF PGO） | 0.084 / 2.3 | 0.084 | 0.108 | 0.085 / 0.226 | 4729 | 8775 | **0.30 / 0.68** |
+| base（odometry + 地面，无回环） | 0.473 / 19.0 | 0.471 | 0.468 | 0.068 / 0.213 | 4925 | 8903 | 0.47 / 0.39 |
+| + 模糊剔除（blur） | 2.128 / 46.3 | 2.128 | 2.118 | **0.060 / 0.183** | 4670 | 9806 | 0.35 / **0.75** |
+| + 免位姿回环（pf） | 0.087 / 2.3 | 0.087 | 0.106 | 0.073 / 0.233 | 4848 | 8748 | 0.45 / 0.43 |
+| + LiDAR（lidar） | 1.018 / 26.8 | 1.018 | 1.006 | 0.229 / 0.318 | 5040 | 9728 | （未建网格） |
+| 全部（full） | 0.084 / 2.2 | 0.084 | 0.106 | 0.167 / 0.268 | 5127 | 9694 | **没检测到桌子** |
+| pf + 模糊（pf_blur，**交付**） | **0.082** / 2.2 | **0.082** | 0.106 | 0.064 / 0.211 | **4525** | **8536** | 0.60 / 0.53 |
+
+桌子：真实桌面直径约 0.7 m（第 0 帧像素宽度×深度估计），半径偏大 = 多份桌子叠加（重影）。图：`results/v3/table_check.png`。
+切片格子数受评估中地面 RANSAC 影响，两次运行相差 1–2%（≈100 格），小于这个的差别不可信。
+
+## 结论（如实）
+1. **主指标上 v3 没有超过 v1**：评估组残差 0.082 m（pf_blur）vs 0.084 m（v1），在噪声内持平。
+   v1 在截止前本来就和免位姿测量一致（v1 的问题主要在 175 s 之后）。
+2. **LiDAR 让所有指标变差**：单独加 LiDAR 后 0→2551 从 0.47 m 恶化到 1.02 m、yaw 误差 19° → 27°，留出 scan→mesh 0.068 → 0.229 m；
+   `full` 里桌子完全消失。原因与 v2 相同：LiDAR 测得的转角比视觉多约 27%（本次 1.277；无轨迹诊断仍给出 fx ≈ 482 而非 554）。
+   **在内参问题解决前不应使用 LiDAR 约束。**
+3. **模糊剔除**：单独使用时全局漂移最大（2.1 m / 46°），但局部指标最好、桌子最完整；与免位姿回环组合（pf_blur）后全局和
+   留出 scan→mesh、切片格子都最好，**但桌子比 v1 明显重影**（半径 0.60 vs 0.30 m，覆盖 0.53 vs 0.68）。
+4. **根因**：6 条免位姿回环边全部在轨迹末段（167–170 s），只约束“末段 vs 起点”。SE(2) 图把这 0.5 m / 19° 的修正
+   **均匀摊到整条轨迹**（每步 odometry σ 相同），而真实误差集中在运动模糊/快速转身段；中段因此被拉弯，绕桌不同侧看到的桌子对不上。
+   v1 有大量中段视觉回环，所以桌子更紧凑。“回环只来自免位姿测量”这一约束下，中段没有任何回环来源。
+5. **交付**：`final_variant: pf_blur`（按留出指标选，不是 `full`）。`results/v3/test_drop.usda` 中桌心正好是网格的一个洞，
+   09 现在会把桌面立方体挪到最近一个落在桌面高度带的点（本次挪了 1.7 cm，下方表面 0.89 m），并在报告里记录挪动距离。
+   如果更看重桌子几何，`results/scene_collision.usdc`（v1）目前仍是更好的碰撞场景。
+
+## 建议的下一步
+- 让修正落到真正出错的地方：按模糊分数 / odometry fitness / ICP 兜底给每步 odometry 不同的 σ，而不是均匀分摊。
+- 中段免位姿回环：把同一套“5 个独立估计离散度”方法从“对首段”推广到任意两个静止片段（需要先找到中段的静止/慢速片段）。
+- 标定 OAK-D 彩色相机内参（或读取设备内参核对 CameraInfo），之后再重新评估 LiDAR 约束。
+
+## v3 交付物（results/v3/，均 < 90 MB，共 27 MB）
+`scene_collision.usdc`（199,999 面，Collision + MeshCollision approximation=none，无 RigidBody）、`mesh_clean.obj`、`mesh_clean.ply`、
+`test_drop.usda`（引用 `./scene_collision.usdc`）、`test_drop_v1.usda`（引用 v1 的 `../scene_collision.usdc`）、`compare.json`、
+`table_check.json/png`、`loop_edges.json/png`、`v3_pose_report.json`、`pose_report.json`、`trajectory_topdown.png`、`lidar_calib.png`、
+`lidar_vs_mesh.png`、`test_scene_report.json`。

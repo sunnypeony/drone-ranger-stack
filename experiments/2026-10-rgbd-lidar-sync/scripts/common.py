@@ -28,9 +28,15 @@ def parse_args(description: str, extra=None) -> argparse.Namespace:
 
 
 def _deep_merge(base: dict, over: dict) -> dict:
+    """Recursive merge; a dict carrying `_replace: true` replaces the inherited value instead."""
     out = dict(base)
     for k, v in over.items():
-        out[k] = _deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+        if isinstance(v, dict) and v.get("_replace"):
+            out[k] = {kk: vv for kk, vv in v.items() if kk != "_replace"}
+        elif isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
     return out
 
 
@@ -49,9 +55,13 @@ def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
             node = node.setdefault(k, {})
         node[leaf] = yaml.safe_load(val)
     # Must happen before the first `import open3d` (all scripts import it lazily, after this).
-    # Open3D's default OpenMP pool (one thread per core) makes RGB-D odometry ~9x slower on a
-    # 32-core host (2.2 s vs 0.24 s per pair); an explicit OMP_NUM_THREADS in the env wins.
-    n = cfg.get("runtime", {}).get("omp_num_threads")
+    # The right OpenMP thread count depends on the stage: Open3D's default pool (one thread per
+    # core) makes RGB-D odometry ~9x slower on a 32-core host (2.2 s vs 0.24 s per pair), while
+    # ScalableTSDF integration is ~140x slower with a single thread (2.4 s vs 1/60 s per frame).
+    # runtime.omp_threads_by_script[<script stem>] wins over runtime.omp_num_threads; null = library
+    # default; an explicit OMP_NUM_THREADS in the environment wins over both.
+    rt = cfg.get("runtime", {})
+    n = (rt.get("omp_threads_by_script") or {}).get(Path(sys.argv[0]).stem, rt.get("omp_num_threads"))
     if n:
         os.environ.setdefault("OMP_NUM_THREADS", str(n))
     return cfg
@@ -476,6 +486,16 @@ def load_frames(cfg: dict):
     rows = list(csv.DictReader(open(d / "frames.csv")))
     intr = json.load(open(d / "intrinsics.json"))
     return d, rows, intr
+
+
+def cutoff_count(cfg: dict, rows) -> int:
+    """Number of leading frames with stamp - stamp[0] <= cutoff_s (all frames if cutoff_s is null).
+    The bag was cut by hand from a longer recording, so its last frame carries no meaning."""
+    c = cfg.get("cutoff_s")
+    if c is None:
+        return len(rows)
+    t = (np.array([int(r["stamp_ns"]) for r in rows], np.int64) - int(rows[0]["stamp_ns"])) / 1e9
+    return int(np.searchsorted(t, c, side="right"))
 
 
 def o3d_intrinsic(intr: dict):

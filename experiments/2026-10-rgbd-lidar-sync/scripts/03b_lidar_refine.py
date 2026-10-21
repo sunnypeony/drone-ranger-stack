@@ -8,6 +8,11 @@ x / y / yaw are re-estimated in an SE(2) pose graph (scipy least_squares + Cauch
 Ablation variants (configs/v2.yaml v2.variants) are written to outputs/v2/ablation/<name>/poses/,
 the final variant also to outputs/v2/poses/.
 Only scans with index % 2 == constraint_parity are used here; the others are held out for evaluation.
+
+v3 options (all default to the v2 behaviour): `cutoff_s` (ignore frames / scans after it),
+`v2.use_v1_visual_loops`, `v2.drop_forced_head_tail`, and `v2.pf_loop_edges` + variant flag
+`pf_loops` (pose-free camera loop edges from pf_loop_edges.py; only the "constraint" group is
+used, the "eval" group is only scored).
 """
 import importlib
 import json
@@ -18,9 +23,9 @@ import numpy as np
 from tqdm import tqdm
 
 import lidar2d as L2
-from common import (T_base_laser_from_cfg, assert_rigid, die, exp_path, find_bag_dir, get_typestore,
-                    interp_T, load_config, load_frames, load_static_tf, open_reader, parse_args,
-                    stage_dir, write_json)
+from common import (T_base_laser_from_cfg, assert_rigid, cutoff_count, die, exp_path, find_bag_dir,
+                    get_typestore, interp_T, load_config, load_frames, load_static_tf, open_reader, parse_args,
+                    rot_angle_deg, stage_dir, write_json)
 
 m3 = importlib.import_module("03_estimate_poses")
 
@@ -210,13 +215,46 @@ def pose_diff(a, b):
     return float(np.linalg.norm(d[:2])), float(np.degrees(abs(d[2])))
 
 
-def visual_loop_list(cfg, loops_cache):
-    P = cfg["poses"]
-    out = []
+def visual_loop_list(cfg, loops_cache, n_cut, n_v1):
+    """Accepted v1 visual loops with both ends before the cutoff. With drop_forced_head_tail, the
+    pairs v1 forced between its first and last loop_force_head_tail keyframes are dropped too."""
+    P, V = cfg["poses"], cfg["v2"]
+    h = P["loop_force_head_tail"]
+    out, n_forced = [], 0
     for key, r in loops_cache.items():
         if r and r["fitness"] >= P["loop_fitness_min"] and r["rmse"] <= P["loop_rmse_max"]:
             b, a = (int(x) for x in key.split("_"))
+            if V.get("drop_forced_head_tail") and min(a, b) < h and max(a, b) >= n_v1 - h:
+                n_forced += 1
+                continue
+            if max(a, b) >= n_cut:
+                continue
             out.append((a, b, np.array(r["T"])))  # T = T_b_a (camera a -> camera b)
+    return out, n_forced
+
+
+def load_pf_edges(cfg):
+    """Accepted pose-free loop edges [(first, frame, T_first_frame, group)]."""
+    path = cfg["v2"].get("pf_loop_edges")
+    if not path:
+        return []
+    f = exp_path(path)
+    if not f.exists():
+        die(f"{f} missing; run scripts/pf_loop_edges.py --config <this config> first")
+    r = json.load(open(f))
+    return [(e["first"], e["frame"], np.array(e["T_first_frame"]), e["group"]) for e in r["edges"] if e["accepted"]]
+
+
+def pf_residuals(T_full, pf):
+    """6DoF residual of every pose-free edge on the final poses (works for interpolated frames too)."""
+    out = []
+    for a, b, T_ref, g in pf:
+        if b >= len(T_full):
+            continue
+        T = np.linalg.inv(T_full[a]) @ T_full[b]
+        out.append({"first": a, "frame": b, "group": g, "ref_distance_m": float(np.linalg.norm(T_ref[:3, 3])),
+                    "translation_error_m": float(np.linalg.norm(T[:3, 3] - T_ref[:3, 3])),
+                    "rotation_error_deg": rot_angle_deg(T_ref[:3, :3].T @ T[:3, :3])})
     return out
 
 
@@ -238,8 +276,13 @@ def main():
     V, Lc, F = cfg["v2"], cfg["lidar"], cfg["frames"]
     out = stage_dir(cfg, "poses")
     fdir, rows, intr = load_frames(cfg)
+    n_v1 = len(rows)
+    n_cut = cutoff_count(cfg, rows)
+    rows = rows[:n_cut]
     stamps = np.array([int(r["stamp_ns"]) for r in rows], np.int64)
     v1dir, odo_v1, gr, loops_cache, final_v1 = v1_artifacts(cfg)
+    if n_cut < n_v1:
+        print(f"cutoff {cfg['cutoff_s']} s: using frames 0..{n_cut - 1} of {n_v1}")
     rng = np.random.default_rng(0)
 
     ts = get_typestore(cfg)
@@ -252,7 +295,8 @@ def main():
     T_ob = np.linalg.inv(T_bo)
     T_bl = T_base_laser_from_cfg(cfg)
     up = np.array([0, 0, 1.0])
-    report = {"T_base_laser": T_bl.tolist(), "n_scans": len(scans)}
+    report = {"T_base_laser": T_bl.tolist(), "n_scans": len(scans), "cutoff_s": cfg.get("cutoff_s"),
+              "n_frames": n_cut, "n_frames_extracted": n_v1}
 
     # ---- 1. blurry frames
     score = blur_scores(fdir, rows, out)
@@ -269,17 +313,18 @@ def main():
     # ---- 2. visual chains (ground constrained)
     fc = m3.FrameCache(fdir, rows, intr, cfg)
     kf_all = np.arange(len(rows))
-    T_all = ground_chain(cfg, odo_v1["trans"], kf_all, gr, T_bo, up)
+    T_all = ground_chain(cfg, odo_v1["trans"][:n_cut - 1], kf_all, gr, T_bo, up)
     tr_s, inf_s, stat_s = sharp_odometry(cfg, fc, sharp, odo_v1, out)
     T_sharp = ground_chain(cfg, tr_s, sharp, gr, T_bo, up)
     chains = {
-        "all": {"kf": kf_all, "traj": Traj(stamps[kf_all], T_all, T_ob), "status": odo_v1["status"], "T": T_all},
+        "all": {"kf": kf_all, "traj": Traj(stamps[kf_all], T_all, T_ob), "status": odo_v1["status"][:n_cut - 1],
+                "T": T_all},
         "sharp": {"kf": sharp, "traj": Traj(stamps[sharp], T_sharp, T_ob), "status": stat_s, "T": T_sharp},
     }
     report["sharp_odometry"] = {"pairs": int(len(stat_s)), "failures": int((stat_s == 1).sum()),
                                 "icp_fallbacks": int((stat_s == 2).sum())}
-    hv = gr["valid"]
-    ground_z = float(np.median(T_all[hv, 2, 3] - gr["heights"][hv]))
+    hv = gr["valid"][:n_cut]
+    ground_z = float(np.median(T_all[hv, 2, 3] - gr["heights"][:n_cut][hv]))
     report["ground_z_world"] = ground_z
 
     # ---- 3. scans: body sector, split
@@ -287,7 +332,8 @@ def main():
     report["body_sector_deg"] = sector
     report["body_sector_max_persistence"] = float(frac.max())
     print(f"operator/body sector(s): {sector} (max near-return persistence {frac.max():.2f})")
-    scans_c = [s for i, s in enumerate(scans) if i % 2 == V["constraint_parity"]]
+    # parity on the index in the full scan list (eval_poses.py uses the same indexing), then the cutoff
+    scans_c = [s for i, s in enumerate(scans) if i % 2 == V["constraint_parity"] and s["stamp"] <= stamps[-1]]
     report["scans_constraint"] = len(scans_c)
     report["scans_heldout"] = len(scans) - len(scans_c)
 
@@ -382,13 +428,20 @@ def main():
     print(f"LiDAR keyframes {len(kfs)}, adjacent edges accepted {len(adj)}, rejected {rej}")
 
     # ---- 6. variants
-    vis_loops = visual_loop_list(cfg, loops_cache)
+    if V.get("use_v1_visual_loops", True):
+        vis_loops, n_forced = visual_loop_list(cfg, loops_cache, n_cut, n_v1)
+    else:
+        vis_loops, n_forced = [], 0
     report["visual_loops_v1"] = len(vis_loops)
+    report["visual_loops_forced_dropped"] = n_forced
+    pf = load_pf_edges(cfg)
+    report["pf_loop_edges"] = {"constraint": sum(g == "constraint" for *_, g in pf), "eval": sum(g == "eval" for *_, g in pf)}
     loop_cache = {n: {} for n in V["variants"]}  # per variant: scan_node offsets differ between node sets
     results = {}
     for name, flags in V["variants"].items():
         use_sharp, use_audit = flags["blur_removal"], flags["audit_visual_loops"]
         use_adj, use_loops = flags["lidar_adjacent"], flags["lidar_loops"]
+        use_pf = flags.get("pf_loops", False)
         ch = chains["sharp" if use_sharp else "all"]
         nodes, traj, status = ch["kf"], ch["traj"], ch["status"]
         node_of = {int(f): k for k, f in enumerate(nodes)}
@@ -440,6 +493,18 @@ def main():
 
         base_edges = [x[:5] for x in vl_edges]
         labels = ["vis_loop"] * len(vl_edges)
+        pf_used, pf_dropped = 0, []
+        if use_pf:
+            for a, b, T_ref, g in pf:
+                if g != "constraint":
+                    continue
+                if a not in node_of or b not in node_of:
+                    pf_dropped.append(b)  # blurry endpoint: not a node of the sharp chain
+                    continue
+                i, j, z = vis_loop_edge(b, a, T_ref, traj, node_of, T_bo, T_ob)  # camera b -> camera a
+                base_edges.append((i, j, z, V["sigma_pf_loop_xy"], np.radians(V["sigma_pf_loop_deg"])))
+                labels.append("pf_loop")
+                pf_used += 1
         if use_adj:
             la = lidar_adj_edges()
             base_edges += la
@@ -475,6 +540,15 @@ def main():
             T_full, mask = Tn, np.ones(len(rows), bool)
         for k, T in enumerate(T_full):
             assert_rigid(T, cfg, f"{name} pose {k}")
+        res = pf_residuals(T_full, pf)
+        vr["pf_loop_edges_used"] = pf_used
+        vr["pf_loop_edges_dropped_blurry"] = pf_dropped
+        vr["pf_residuals"] = res
+        for g in ("constraint", "eval"):
+            e = [x["translation_error_m"] for x in res if x["group"] == g]
+            vr[f"pf_residual_{g}_median_m"] = float(np.median(e)) if e else None
+        r2551 = [x for x in res if x["frame"] == 2551]
+        vr["pf_residual_2551_m"] = r2551[0]["translation_error_m"] if r2551 else None
         vr.update({"nodes": len(nodes), "visual_odometry_edges": len(nodes) - 1,
                    "visual_loop_edges": len(vl_edges), "visual_loop_audit": audit if use_audit else None,
                    "flags": flags,
