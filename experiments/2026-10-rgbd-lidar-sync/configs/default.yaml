@@ -41,9 +41,12 @@ cutoff_s: null
 
 runtime:
   omp_num_threads: null        # OpenMP threads for Open3D (null = library default = all cores)
-  omp_threads_by_script:       # per-script override (stem of the script name)
-    03_estimate_poses: 1       # RGB-D odometry: 0.24 s/pair at 1 thread vs 2.2 s at 32
-    03b_lidar_refine: 1
+  omp_auto_max: 4              # "auto" = min(CPU count, this)
+  omp_threads_by_script:       # per-script override (stem of the script name); int | auto | null
+    # RGB-D odometry: 0.24 s/pair at 1 thread vs 2.2 s at 32 threads on a 32-core host (oversubscribed);
+    # on the 4-vCPU cloud VM 4 threads are as fast or faster (0.34 vs 0.40 s/pair). auto caps at 4.
+    03_estimate_poses: auto
+    03b_lidar_refine: auto
 
 inspect:
   sample_frame_index: 50       # which matched RGB-D pair to dump (clamped to available)

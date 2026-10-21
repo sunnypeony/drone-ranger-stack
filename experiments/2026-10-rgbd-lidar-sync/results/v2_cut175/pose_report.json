@@ -1,0 +1,42 @@
+{
+  "pf_loop_edges_used": 0,
+  "pf_loop_edges_dropped_blurry": [],
+  "pf_residuals": [],
+  "pf_residual_constraint_median_m": null,
+  "pf_residual_eval_median_m": null,
+  "pf_residual_2551_m": null,
+  "nodes": 2626,
+  "visual_odometry_edges": 2625,
+  "visual_loop_edges": 278,
+  "visual_loop_audit": null,
+  "flags": {
+    "blur_removal": false,
+    "audit_visual_loops": false,
+    "lidar_adjacent": true,
+    "lidar_loops": true
+  },
+  "lidar_adjacent_edges": 69,
+  "lidar_loop_edges": 62,
+  "lidar_loop_stats": {
+    "candidates": 218,
+    "accepted": 62,
+    "rej_match": 51,
+    "rej_ambiguous": 85,
+    "rej_visual_inconsistent": 20
+  },
+  "head_tail_m": 0.4729909695175053,
+  "graph": {
+    "cost": 1802.3266384532776,
+    "nfev": 69,
+    "status": 2,
+    "graph_nodes": 264,
+    "whitened_residual_median_by_type": {
+      "lidar_adj": 1.0128843444436562,
+      "lidar_loop": 0.8605463217987432,
+      "vis_loop": 1.7997595804942976,
+      "vis_odo": 1.0496748311102977
+    }
+  },
+  "path_length_m": 34.23657860571433,
+  "n_tsdf_frames": 2626
+}

@@ -10,12 +10,14 @@ CONFIG=configs/v2.yaml
 PY=${PYTHON:-.venv/bin/python}
 [[ -x "$PY" ]] || { echo "python venv not found at $PY"; exit 1; }
 export MPLBACKEND=Agg
-mkdir -p outputs/v2/logs
+LOGDIR=outputs/logs/$(basename "$CONFIG" .yaml)
+mkdir -p "$LOGDIR"
 
 for s in 03b_lidar_refine 04_integrate_tsdf 05_postprocess_mesh 06_export_usd 07_lidar_check 08_evaluate_v2 09_test_scene; do
   echo "==================== v2 $s ===================="
   start=$(date +%s)
-  "$PY" "scripts/$s.py" --config "$CONFIG" 2>&1 | tee "outputs/v2/logs/$s.log"
+  "$PY" "scripts/$s.py" --config "$CONFIG" 2>&1 | tee "$LOGDIR/$s.log"
   echo "[run_v2] $s finished in $(( $(date +%s) - start ))s"
 done
-"$PY" scripts/verify_usd.py results/v2/scene_collision.usdc | tee outputs/v2/logs/verify_usd.log
+RES=$("$PY" -c "import sys; sys.path.insert(0, 'scripts'); from common import load_config, exp_path; print(exp_path(load_config('$CONFIG')['paths']['results_dir']))")
+"$PY" scripts/verify_usd.py "$RES/scene_collision.usdc" | tee "$LOGDIR/verify_usd.log"

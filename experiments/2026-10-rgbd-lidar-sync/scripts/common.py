@@ -59,9 +59,13 @@ def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
     # core) makes RGB-D odometry ~9x slower on a 32-core host (2.2 s vs 0.24 s per pair), while
     # ScalableTSDF integration is ~140x slower with a single thread (2.4 s vs 1/60 s per frame).
     # runtime.omp_threads_by_script[<script stem>] wins over runtime.omp_num_threads; null = library
-    # default; an explicit OMP_NUM_THREADS in the environment wins over both.
+    # default; "auto" = min(CPU count, runtime.omp_auto_max) so the same config is multi-threaded on
+    # a small cloud VM without oversubscribing a large host; an explicit OMP_NUM_THREADS in the
+    # environment wins over all of these.
     rt = cfg.get("runtime", {})
     n = (rt.get("omp_threads_by_script") or {}).get(Path(sys.argv[0]).stem, rt.get("omp_num_threads"))
+    if n == "auto":
+        n = max(1, min(os.cpu_count() or 1, int(rt.get("omp_auto_max", 4))))
     if n:
         os.environ.setdefault("OMP_NUM_THREADS", str(n))
     return cfg

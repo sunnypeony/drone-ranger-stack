@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 
 import lidar2d as L2
-from common import (EXP_DIR, T_base_laser_from_cfg, exp_path, find_bag_dir, get_typestore, interp_T,
+from common import (EXP_DIR, T_base_laser_from_cfg, cutoff_count, exp_path, find_bag_dir, get_typestore, interp_T,
                     load_config, load_frames, load_static_tf, open_reader, parse_args, stage_dir, write_json)
 from scene_utils import find_table
 
@@ -66,9 +66,11 @@ def run_stage(script, config, sets):
 
 
 def variant_dirs(cfg):
+    """With a cutoff, v1 is re-meshed from its own poses truncated to the cutoff (ablation/v1), so
+    every variant is evaluated on the same frames; without one, the v1 outputs are used as they are."""
     root = exp_path(cfg["paths"]["outputs_dir"])
     V = cfg["v2"]
-    d = {"v1": exp_path(cfg["paths"]["v1_outputs_dir"])}
+    d = {"v1": root / "ablation" / "v1" if cfg.get("cutoff_s") is not None else exp_path(cfg["paths"]["v1_outputs_dir"])}
     for n in V["variants"]:
         d[n] = root if n == V["final_variant"] else root / "ablation" / n
     return d
@@ -164,16 +166,27 @@ def main():
     out = stage_dir(cfg, "eval")
     dirs = variant_dirs(cfg)
 
-    # ---- meshes for non-final variants
+    fdir, rows, intr = load_frames(cfg)
+    n_cut = cutoff_count(cfg, rows)
+    rows = rows[:n_cut]
+    if cfg.get("cutoff_s") is not None:
+        print(f"cutoff {cfg['cutoff_s']} s: evaluating frames 0..{n_cut - 1}; v1 re-meshed from its truncated poses")
+        v1p = np.load(exp_path(cfg["paths"]["v1_outputs_dir"]) / "poses" / "poses.npz", allow_pickle=True)
+        vd = dirs["v1"] / "poses"
+        vd.mkdir(parents=True, exist_ok=True)
+        keep = v1p["frame_idx"] < n_cut
+        np.savez(vd / "poses.npz", **{k: (v1p[k][keep] if k in ("T_world_optical", "frame_idx", "stamp_ns") else v1p[k])
+                                      for k in v1p.files})
+
+    # ---- meshes for non-final variants (and the truncated v1)
     for n, d in dirs.items():
-        if n in ("v1", V["final_variant"]):
+        if n == V["final_variant"] or (n == "v1" and cfg.get("cutoff_s") is None):
             continue
         if not (d / "mesh" / "mesh_clean.ply").exists():
             sets = [f"paths.outputs_dir={d.relative_to(EXP_DIR)}", f"paths.results_dir={(d / 'results').relative_to(EXP_DIR)}"]
             run_stage("04_integrate_tsdf.py", args.config, sets)
             run_stage("05_postprocess_mesh.py", args.config, sets)
 
-    fdir, rows, intr = load_frames(cfg)
     pdir = stage_dir(cfg, "poses")
     v2rep = json.load(open(pdir / "v2_pose_report.json"))
     calib = json.load(open(pdir / "lidar_calib.json"))
@@ -216,7 +229,7 @@ def main():
         dist_fov = scene.compute_distance(o3d.core.Tensor(P[infov].astype(np.float32))).numpy()
         S, tags = slice_points(cfg, fdir, rows, intr, frames, Ts)
         cells = len(np.unique(np.floor(S[:, :2] / E["slice_grid"]).astype(np.int64), axis=0))
-        tilt = m3.tilt_residual_deg(Ts, gr["normals"], gr["valid"], np.array([0, 0, 1.0]))
+        tilt = m3.tilt_residual_deg(Ts, gr["normals"][:len(Ts)], gr["valid"][:len(Ts)], np.array([0, 0, 1.0]))
         mrep = json.load(open(d / "mesh" / "mesh_report.json"))
         crisp, ncr = crispness(cfg, scans, body, bins, T_bl, T_ob, Tu, stamps, dt, v2rep["ground_z_world"])
         table[n] = {"heldout_fov_dist_median_m": float(np.median(dist_fov)),
@@ -258,6 +271,7 @@ def main():
                                                      "v1 2 cm": data["v1"]["mesh"]}, table_detect[final])
 
     rep = {"ablation": table, "closure_reference_heldout": ref, "fov_half_deg": fov_half,
+           "cutoff_s": cfg.get("cutoff_s"), "n_frames": n_cut,
            "table_check_center": table_center.tolist(), "time_offset_s": calib["time_offset_s"],
            "v2_pose_report": v2rep,
            "table_detection": table_detect, "extra_voxel": extra,
@@ -307,7 +321,8 @@ def plots(out, data, final, dirs, E):
         plt.close(fig)
     # trajectories
     fig, ax = plt.subplots(figsize=(9, 9))
-    for n, sty in zip(names, ["k-", "c--", "g-.", "m:", "b-"]):
+    styles = ["k-", "c--", "g-.", "m:", "b-", "r--", "y-.", "k:"]
+    for n, sty in zip(names, styles * (len(names) // len(styles) + 1)):
         p = data[n]["Ts"][:, :3, 3]
         ax.plot(p[:, 0], p[:, 1], sty, lw=1.2, label=f"{n} (head-tail {np.linalg.norm(p[-1] - p[0]):.2f} m)")
         ax.plot(p[0, 0], p[0, 1], "go")

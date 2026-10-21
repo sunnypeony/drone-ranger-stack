@@ -1,0 +1,10 @@
+# v2 ablation re-run with the 175 s cutoff introduced in v3 (the bag is a hand-cut excerpt; its last
+# frame is arbitrary). Everything else is exactly configs/v2.yaml; v1 is re-meshed from its own poses
+# truncated to the cutoff so all variants are evaluated on frames 0..2625.
+base: v2.yaml
+
+cutoff_s: 175.0
+
+paths:
+  outputs_dir: outputs/v2_cut175
+  results_dir: results/v2_cut175
