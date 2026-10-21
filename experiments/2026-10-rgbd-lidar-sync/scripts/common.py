@@ -48,6 +48,12 @@ def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
         for k in parents:
             node = node.setdefault(k, {})
         node[leaf] = yaml.safe_load(val)
+    # Must happen before the first `import open3d` (all scripts import it lazily, after this).
+    # Open3D's default OpenMP pool (one thread per core) makes RGB-D odometry ~9x slower on a
+    # 32-core host (2.2 s vs 0.24 s per pair); an explicit OMP_NUM_THREADS in the env wins.
+    n = cfg.get("runtime", {}).get("omp_num_threads")
+    if n:
+        os.environ.setdefault("OMP_NUM_THREADS", str(n))
     return cfg
 
 

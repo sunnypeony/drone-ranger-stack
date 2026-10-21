@@ -126,6 +126,16 @@ depth_trunc = `extract.depth_max`（5 m）。
 **注意**：相机 stamp 是主机 `now()`，LiDAR 与相机之间的时间映射未标定，偏差属预期；
 此检查用于发现大错误（外参错、轴向镜像、尺度错），不是精度评估。
 
+### 辅助工具：首尾裁决与位姿评估
+- `scripts/check_head_tail.py` → `outputs/head_tail/`：**不依赖任何位姿**判断是否回到起点。
+  首段/尾段各取 5 帧，两两 FPFH + RANSAC（单位阵初值）+ 点到面 ICP；先去掉地平面（草地对绕法向的任意
+  偏航都能拟合，带地面时 fitness 无法区分 180° 翻转）。首段相机静止，所以每个尾帧有 5 次重复测量，
+  `per_tail_direct.spread_max_m` 就是它的可信度。另有对末尾 400 帧的扫描 `head_tail_sweep.png`。
+  RANSAC 在多线程下不可复现，噪声帧多次运行会差 0.2–0.3 m，只信 spread 小的结果。
+- `scripts/eval_poses.py [--poses name=path ...]` → `outputs/eval/compare.json`：对多套位姿算同一组指标。
+  只有 `head_tail_reference_error`（与上面免位姿测量的差）能看到全局漂移；相机高度/地面带对用了地面约束的
+  位姿天然有利；scan→mesh 用各自的网格且只取相机视场内的点，只反映局部一致性。
+
 ## 常见失败现象 → 原因
 
 | 现象 | 最可能原因 | 排查 |
@@ -271,6 +281,9 @@ LiDAR 相邻 2 cm / 0.5°、LiDAR 回环 5 cm / 1°；Cauchy，`f_scale=2`（白
 - `closure`：用**留出 scan** 直接配准起点和终点（宽范围 CSM ±2 m/±45° + ICP，fitness 0.53）得到参考：
   终点相对起点 **1.02 m**。closure = 估计的起点→终点相对位姿与该参考之差。
   （首尾距离本身在这段录制里**不是误差指标**：采集者结束时离起点约 1 m。）
+  独立交叉验证：纯相机、免位姿的 `scripts/check_head_tail.py`（去地面 FPFH+RANSAC+ICP，5 个静止首帧重复测量）
+  给出：第 2651 帧回到距起点 0.17 m，之后离开；2663 帧距起点 0.60 m（spread 0.10 m，可信），末帧 0.80 m
+  （spread 0.98 m，不可信）。两种独立方法都说明终点离起点约 0.6–1.0 m，既不是 SE(2) 变体的 0.1 m，也不是 v1 的 1.43 m。
 - `slice_cells`：0.4–1.2 m 高度带投到 5 cm 栅格的占据格子数（越少越清晰）。
 - `table_tris`：原始 TSDF 网格中桌子区域的三角面数（桌子被不一致视角“掏空”时会骤降）。
 - `tilt`：倾角误差中位数。

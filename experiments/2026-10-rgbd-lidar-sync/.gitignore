@@ -1,6 +1,6 @@
 data/
 outputs/
-.venv/
+.venv*/
 !results/
 !results/*.ply
 *.log

@@ -35,6 +35,9 @@ frames:
 
 typestore: ROS2_HUMBLE
 
+runtime:
+  omp_num_threads: 1           # OpenMP threads for Open3D (null = library default = all cores)
+
 inspect:
   sample_frame_index: 50       # which matched RGB-D pair to dump (clamped to available)
   allowed_depth_encodings: [16UC1, mono16, 32FC1]
@@ -132,6 +135,40 @@ poses:
   rigid_det_tol: 1.0e-3
   rigid_orth_tol: 1.0e-3
 
+head_tail_check:               # scripts/check_head_tail.py: pose-free start/end adjudication
+  head_frames: [0, 150]        # extracted-frame index range [start, end) for the head segment
+  tail_frames: 150             # last N extracted frames form the tail segment
+  n_samples: 5                 # frames sampled evenly from each segment (25 head x tail pairs)
+  depth_max: 4.0               # m
+  voxel: 0.05                  # m, FPFH / RANSAC resolution
+  normal_radius_scale: 2.0     # x voxel
+  fpfh_radius_scale: 5.0       # x voxel
+  fpfh_max_nn: 100
+  ransac_dist_scale: 1.5       # x voxel
+  ransac_edge_length: 0.9
+  ransac_max_iter: 200000
+  ransac_confidence: 0.999
+  ransac_seed: 0
+  icp_voxels: [0.05, 0.025]    # m, point-to-plane refinement pyramid
+  icp_max_iter: [60, 40]
+  icp_corr_scale: 1.5          # x voxel
+  fitness_min: 0.3             # ICP fitness below this = registration not trusted
+  # The yard ground fits any yaw about its normal, so with ground points fitness cannot tell a
+  # 180-deg flip from a correct result. Remove the dominant plane before registering.
+  remove_ground: true
+  ground_dist: 0.05            # m, RANSAC plane inlier distance
+  ground_ransac_iters: 1000
+  ground_min_frac: 0.15        # only remove the plane if it holds at least this point fraction
+  agree_trans_m: 0.15          # results within this of the median count as "agreeing"
+  agree_rot_deg: 5.0
+  out_dir: head_tail           # under outputs/
+  sweep_frames: 400            # also register every sweep_stride-th of the last N frames to the first
+  sweep_stride: 10
+  max_plausible_rot_deg: 45.0  # sweep results rotated more than this do not share the start view
+  reference_head_tail_m:       # head-tail distances reported by earlier runs, for comparison
+    cloud_v1: 1.43
+    local_v1_direct: 0.064
+
 tsdf:
   voxel_length: 0.02
   sdf_trunc: 0.08
@@ -174,3 +211,33 @@ lidar:
   T_base_laser: null           # [x, y, z, yaw_deg] fixed measured extrinsic; null = use /tf_static
   plot_extent_margin: 1.0
   max_points_plot: 200000
+
+eval:                          # scripts/eval_poses.py: same metrics for every pose set
+  pose_sets:                   # name -> poses.npz (T_world_optical, frame_idx, stamp_ns)
+    cloud_v1: outputs/poses/poses.npz
+    local_v1: outputs/local_v1/poses/poses.npz
+  out_dir: eval
+  cloud_every: 10              # accumulated cloud: every Nth posed frame
+  cloud_voxel: 0.03
+  depth_max: 4.0
+  ground_dist: 0.05            # m, RANSAC inlier distance = the "+-5 cm ground band"
+  ground_ransac_iters: 2000
+  ground_max_tilt_deg: 30.0    # ground plane normal must be within this of world +Z
+  ground_max_tries: 5          # planes peeled off while looking for the ground
+  slice: [0.4, 1.2]            # m above ground, ghosting slice
+  slice_grid: 0.05             # m, occupancy cell size
+  mesh_voxel: 0.03             # coarse TSDF just for the scan-to-mesh metric
+  mesh_sdf_trunc: 0.12
+  mesh_frame_stride: 2
+  scan_stride: 5
+  scan_range_max: 4.0          # m, only score returns where the RGB-D mesh can exist
+  # The LiDAR sees 360 deg but the camera only ever looks forward (~60 deg HFOV): returns to
+  # the sides/back mostly have no mesh near them whatever the poses, which swamps the metric.
+  scan_camera_fov_only: true
+  scan_fov_margin_deg: 0.0     # shrink (+) / grow (-) the camera HFOV for the scan filter
+  # Pose-free references from check_head_tail.py: relative pose first-frame -> tail frame, used
+  # only for tail frames whose 5 repeated (static-head) registrations agree within ref_max_spread_m.
+  # This is the only metric here that sees global drift; the others are local / self-consistent.
+  head_tail_reference: outputs/head_tail/head_tail.json
+  ref_max_spread_m: 0.08
+  ref_max_rot_range_deg: 3.0
