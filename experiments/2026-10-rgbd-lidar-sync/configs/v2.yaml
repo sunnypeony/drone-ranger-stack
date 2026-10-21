@@ -1,0 +1,142 @@
+# v2: v1 pipeline + 2D LiDAR constraints on x / y / yaw (roll / pitch / z stay from the ground constraint).
+# Inherits everything from default.yaml; only differences are listed here.
+base: default.yaml
+
+paths:
+  outputs_dir: outputs/v2
+  results_dir: results/v2
+  frames_dir: outputs/frames         # reuse the v1 extracted frames
+  v1_outputs_dir: outputs            # v1 odometry / ground / loop checkpoints and final poses
+
+lidar:
+  range_min: 0.6
+  range_max: 8.0
+  T_base_laser: [0.125, 0.0, 0.025, 0.0]   # measured [x, y, z, yaw_deg]; fixed, /tf_static ignored
+  time_offset_s: auto                       # auto = value adopted by 03b (lidar_calib.json), else 0
+
+v2:
+  # --- blurry frames ---
+  blur_percentile: 10.0            # Laplacian-variance threshold = this percentile of the sequence
+  blur_threshold: null             # absolute threshold overrides the percentile when set
+  # --- scans ---
+  constraint_parity: 0             # scans with index % 2 == parity constrain the graph, the others are held out
+  body_bin_deg: 5.0
+  body_min_range: 0.05             # m
+  body_max_range: 1.0              # m, "near" return
+  body_min_persistence: 0.5        # fraction of scans with a near return in a bin -> operator body
+  body_margin_bins: 1
+  min_height_above_ground: 0.2     # m, drop ground hits
+  max_height_above_ground: 2.0     # m
+  # --- keyframes / submaps ---
+  kf_dist: 0.3                     # m
+  kf_angle_deg: 10.0
+  submap_scans: 2                  # +- constraint scans aggregated into a keyframe submap (visual odometry)
+  submap_voxel: 0.05               # m
+  # --- 2D point-to-line ICP ---
+  icp_min_points: 40
+  icp_normal_k: 6
+  icp_min_planarity: 0.3
+  icp_max_dist: [0.5, 0.25, 0.1]   # m, coarse -> fine correspondence gates
+  icp_iters: 25
+  icp_huber: 0.05                  # m
+  adj_fitness_min: 0.5
+  adj_rmse_max: 0.05               # m
+  adj_max_correction_xy: 0.3       # m vs visual-odometry init
+  adj_max_correction_deg: 10.0
+  # --- correlative scan matching ---
+  csm_resolution: 0.05
+  csm_margin: 1.0
+  csm_sigma: 0.07
+  csm_max_points: 300
+  csm_yaw_range_deg: 30.0
+  csm_yaw_step_deg: 1.0
+  csm_xy_range: 0.5
+  csm_xy_step: 0.05
+  csm_peak_exclusion_xy: 0.15
+  csm_peak_exclusion_deg: 4.0
+  # --- LiDAR loops ---
+  loop_max_dist: 1.5               # m, on current pose estimate
+  loop_min_gap_s: 20.0
+  loop_max_candidates_per_kf: 3
+  loop_rounds: 2
+  loop_fitness_min: 0.45           # outdoor submaps: true loop matches score ~0.3-0.6
+  loop_rmse_max: 0.05
+  loop_csm_ratio_min: 1.15         # best / best-away-from-peak (repetitive fence / foliage guard)
+  loop_visual_window_s: 1.0        # a visual loop within this time of both ends must agree
+  loop_visual_agree_xy: 0.3
+  loop_visual_agree_deg: 5.0
+  # --- visual loop audit ---
+  audit_scan_max_dt_s: 0.1
+  audit_agree_xy: 0.3
+  audit_agree_deg: 5.0
+  audit_inconclusive_sigma_scale: 3.0
+  # --- SE(2) graph (sigmas per edge) ---
+  sigma_vis_odo_xy: 0.005
+  sigma_vis_odo_deg: 0.25
+  sigma_vis_odo_fail_scale: 10.0
+  sigma_vis_loop_xy: 0.05
+  sigma_vis_loop_deg: 1.0
+  sigma_lidar_adj_xy: 0.02
+  sigma_lidar_adj_deg: 0.5
+  sigma_lidar_loop_xy: 0.05
+  sigma_lidar_loop_deg: 1.0
+  pg_loss: cauchy
+  pg_f_scale: 2.0                  # whitened residual where the robust kernel starts down-weighting
+  pg_anchor_weight: 1.0e+6
+  pg_max_nfev: 200
+  pg_node_stride: 10              # graph node every N chain poses (others follow by interpolated correction)
+  pg_tr_solver: exact
+  # --- calibration grid search (diagnostic) ---
+  calib_time_offsets: [-0.3, 0.3, 0.02]   # s, [start, stop, step]
+  calib_yaw_offsets: [-10.0, 10.0, 1.0]   # deg
+  calib_scan_stride: 4             # constraint scans used for the objective
+  calib_pair_gap: 5                # constraint scans between the two scans of a consistency pair
+  calib_nn_cap: 0.5                # m, cap NN distance in the consistency objective
+  calib_smooth: 3                  # moving-average window before peak analysis
+  calib_peak_min_contrast: 0.03    # (edge value - min) / min needed for a "clear" peak
+  calib_adopt_time_offset: true    # adopt dt automatically when the peak is clear
+  calib_yaw_warn_deg: 3.0          # warn if the clear yaw optimum is further than this from 0
+  # --- diagnostics (reported only) ---
+  rotation_diag_segment_s: 30.0
+  scale_diag_scan_stride: 4
+  scale_diag_max_dt_s: 0.035
+  scale_diag_max_range: 4.0
+  scale_diag_band: 0.04            # m around the laser plane height
+  scale_diag_grid: [0.8, 1.45, 0.05]
+  # --- variants (ablation) ---
+  variants:
+    v1_se2:           {blur_removal: false, audit_visual_loops: false, lidar_adjacent: false, lidar_loops: false}
+    lidar_adj:        {blur_removal: false, audit_visual_loops: false, lidar_adjacent: true,  lidar_loops: false}
+    lidar_loops:      {blur_removal: false, audit_visual_loops: false, lidar_adjacent: true,  lidar_loops: true}
+    lidar_loops_blur: {blur_removal: true,  audit_visual_loops: false, lidar_adjacent: true,  lidar_loops: true}
+    full:             {blur_removal: true,  audit_visual_loops: true,  lidar_adjacent: true,  lidar_loops: true}
+  # Deliverable variant. Chosen from the ablation (held-out metrics), NOT assumed to be "full":
+  # with the audit the camera geometry breaks (see README v2 / report.json).
+  final_variant: lidar_loops
+
+eval:
+  slice_band: [0.4, 1.2]           # m above ground
+  slice_grid: 0.05                 # m
+  frame_every: 10                  # depth frames used for the slice-occupancy metric
+  depth_max: 4.0                   # m
+  compare_range_max: 4.0           # m, held-out scan -> mesh distance only within this range
+  crisp_scan_stride: 2            # every 2nd held-out scan
+  crisp_point_stride: 7
+  crisp_radius: 0.5               # m
+  crisp_min_gap_s: 20.0
+  table_check_radius: 0.7         # m around the v1-detected table centre
+  table_check_band: [0.5, 1.1]    # m
+  closure_csm_xy_range: 2.0       # m, wide search for the held-out start->end reference
+  closure_csm_yaw_range_deg: 45.0
+  extra_voxel: 0.015               # try a finer TSDF for the final variant (0 / null = skip)
+
+test_scene:
+  cube_size: 0.2
+  cube_mass: 1.0
+  drop_height: 1.0                 # m above the surface below each cube
+  gravity: 9.81
+  table_center: null               # [x, y] override; null = detect from the mesh
+  table_search_radius: 1.5         # m around the trajectory centroid
+  table_band: [0.5, 1.1]           # m, height band of the table top / pots
+  ground_offset: 1.5               # m from the table centre for the ground cube
+  light_intensity: 3000.0

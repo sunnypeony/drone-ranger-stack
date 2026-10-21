@@ -36,7 +36,7 @@ def match_pairs(rgb_st, dep_st, tol_ns):
 
 def main():
     args = parse_args(__doc__)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     ex, T = cfg["extract"], cfg["topics"]
     out = stage_dir(cfg, "frames")
     (out / "color").mkdir(exist_ok=True)

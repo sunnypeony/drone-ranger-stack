@@ -27,7 +27,7 @@ def input_hash(cfg, poses_path):
 def main():
     import open3d as o3d
     args = parse_args(__doc__, lambda p: p.add_argument("--force", action="store_true", help="ignore done.json"))
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     C = cfg["tsdf"]
     out = stage_dir(cfg, "tsdf")
     fdir, rows, intr = load_frames(cfg)
@@ -49,7 +49,9 @@ def main():
         voxel_length=C["voxel_length"], sdf_trunc=C["sdf_trunc"],
         color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
 
-    sel = list(range(0, len(idx), C["frame_stride"]))
+    mask = z["tsdf_mask"] if "tsdf_mask" in z.files else np.ones(len(idx), bool)  # v2: blurry frames excluded
+    sel = [k for k in range(0, len(idx), C["frame_stride"]) if mask[k]]
+    print(f"integrating {len(sel)} of {len(idx)} posed frames ({int((~mask).sum())} excluded by tsdf_mask)")
     t0 = time.time()
     for n, k in enumerate(tqdm(sel, desc="integrate")):
         T = Ts[k]

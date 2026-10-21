@@ -1,0 +1,36 @@
+{
+  "nodes": 2701,
+  "visual_odometry_edges": 2700,
+  "visual_loop_edges": 334,
+  "visual_loop_audit": null,
+  "flags": {
+    "blur_removal": false,
+    "audit_visual_loops": false,
+    "lidar_adjacent": true,
+    "lidar_loops": true
+  },
+  "lidar_adjacent_edges": 71,
+  "lidar_loop_edges": 51,
+  "lidar_loop_stats": {
+    "candidates": 229,
+    "accepted": 51,
+    "rej_match": 56,
+    "rej_ambiguous": 100,
+    "rej_visual_inconsistent": 22
+  },
+  "head_tail_m": 0.10462763500222313,
+  "graph": {
+    "cost": 2229.5808254973485,
+    "nfev": 91,
+    "status": 2,
+    "graph_nodes": 271,
+    "whitened_residual_median_by_type": {
+      "lidar_adj": 1.2527354696188782,
+      "lidar_loop": 1.1094828280025009,
+      "vis_loop": 2.0833101366138753,
+      "vis_odo": 1.0909320654477974
+    }
+  },
+  "path_length_m": 36.60408556886238,
+  "n_tsdf_frames": 2701
+}

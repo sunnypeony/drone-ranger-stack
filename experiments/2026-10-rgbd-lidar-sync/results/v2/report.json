@@ -1,0 +1,1081 @@
+{
+  "ablation": {
+    "v1": {
+      "heldout_fov_dist_median_m": 0.3089984953403473,
+      "heldout_fov_dist_p90_m": 0.5954008102416992,
+      "heldout_dist_median_m": 0.4893449544906616,
+      "heldout_dist_p90_m": 0.8738192915916443,
+      "heldout_points": 26778,
+      "heldout_fov_points": 8559,
+      "lidar_crispness_median_m": 0.026498030688909133,
+      "lidar_crispness_samples": 7144,
+      "table_region_raw_triangles": 13147,
+      "head_tail_m": 1.4297208109699326,
+      "closure_err_xy_m": 0.5034078159782543,
+      "closure_err_deg": 11.128389597217904,
+      "path_length_m": 32.81973312874997,
+      "slice_cells": 5447,
+      "slice_points": 308775,
+      "tilt_median_deg": 0.7234228675023032,
+      "tilt_p90_deg": 1.379084260415239,
+      "mesh_triangles": 200000
+    },
+    "v1_se2": {
+      "heldout_fov_dist_median_m": 0.4043421745300293,
+      "heldout_fov_dist_p90_m": 0.7314748764038086,
+      "heldout_dist_median_m": 0.432669460773468,
+      "heldout_dist_p90_m": 0.8570127487182617,
+      "heldout_points": 26773,
+      "heldout_fov_points": 8559,
+      "lidar_crispness_median_m": 0.028294604566199748,
+      "lidar_crispness_samples": 7085,
+      "table_region_raw_triangles": 10660,
+      "head_tail_m": 0.10550665495517855,
+      "closure_err_xy_m": 1.1077102948820634,
+      "closure_err_deg": 2.103163444027402,
+      "path_length_m": 34.82936120646383,
+      "slice_cells": 5614,
+      "slice_points": 308130,
+      "tilt_median_deg": 0.5879199257039388,
+      "tilt_p90_deg": 1.1448226687388974,
+      "mesh_triangles": 200000
+    },
+    "lidar_adj": {
+      "heldout_fov_dist_median_m": 0.2320774495601654,
+      "heldout_fov_dist_p90_m": 0.6798703074455261,
+      "heldout_dist_median_m": 0.5146826505661011,
+      "heldout_dist_p90_m": 0.9660669565200806,
+      "heldout_points": 26766,
+      "heldout_fov_points": 8559,
+      "lidar_crispness_median_m": 0.023174092438348108,
+      "lidar_crispness_samples": 7140,
+      "table_region_raw_triangles": 11494,
+      "head_tail_m": 0.1046612844089021,
+      "closure_err_xy_m": 1.0980808922432979,
+      "closure_err_deg": 1.928430682265627,
+      "path_length_m": 34.64257680792075,
+      "slice_cells": 5695,
+      "slice_points": 308860,
+      "tilt_median_deg": 0.6105508730475779,
+      "tilt_p90_deg": 1.1830169546735694,
+      "mesh_triangles": 200000
+    },
+    "lidar_loops": {
+      "heldout_fov_dist_median_m": 0.1983240246772766,
+      "heldout_fov_dist_p90_m": 0.6032434701919556,
+      "heldout_dist_median_m": 0.41029417514801025,
+      "heldout_dist_p90_m": 0.9861754179000854,
+      "heldout_points": 26782,
+      "heldout_fov_points": 8559,
+      "lidar_crispness_median_m": 0.01888050182013627,
+      "lidar_crispness_samples": 7171,
+      "table_region_raw_triangles": 17156,
+      "head_tail_m": 0.10462763500222316,
+      "closure_err_xy_m": 1.1227806122256787,
+      "closure_err_deg": 1.2300115567549699,
+      "path_length_m": 36.60408556886239,
+      "slice_cells": 5897,
+      "slice_points": 309437,
+      "tilt_median_deg": 0.6807300474479516,
+      "tilt_p90_deg": 1.3342639888103043,
+      "mesh_triangles": 200000
+    },
+    "lidar_loops_blur": {
+      "heldout_fov_dist_median_m": 0.7657650113105774,
+      "heldout_fov_dist_p90_m": 0.8685254454612732,
+      "heldout_dist_median_m": 0.645087480545044,
+      "heldout_dist_p90_m": 0.8603601455688477,
+      "heldout_points": 26778,
+      "heldout_fov_points": 8559,
+      "lidar_crispness_median_m": 0.01770753387729702,
+      "lidar_crispness_samples": 7093,
+      "table_region_raw_triangles": 71,
+      "head_tail_m": 0.09154702339509253,
+      "closure_err_xy_m": 1.0891569996902528,
+      "closure_err_deg": 1.7275561974935145,
+      "path_length_m": 35.655899185226204,
+      "slice_cells": 5896,
+      "slice_points": 309984,
+      "tilt_median_deg": 0.6838188455470726,
+      "tilt_p90_deg": 1.3949093888485156,
+      "mesh_triangles": 199999
+    },
+    "full": {
+      "heldout_fov_dist_median_m": 0.7702838778495789,
+      "heldout_fov_dist_p90_m": 0.8913201093673706,
+      "heldout_dist_median_m": 0.4965435564517975,
+      "heldout_dist_p90_m": 0.8724328875541687,
+      "heldout_points": 26772,
+      "heldout_fov_points": 8559,
+      "lidar_crispness_median_m": 0.015403799426214634,
+      "lidar_crispness_samples": 7136,
+      "table_region_raw_triangles": 518,
+      "head_tail_m": 0.10411918645654245,
+      "closure_err_xy_m": 1.0386797014412483,
+      "closure_err_deg": 0.4238475798835077,
+      "path_length_m": 34.004965705473445,
+      "slice_cells": 5832,
+      "slice_points": 310880,
+      "tilt_median_deg": 0.6628580574633575,
+      "tilt_p90_deg": 1.3884748279877184,
+      "mesh_triangles": 200000
+    }
+  },
+  "closure_reference_heldout": {
+    "Z": [
+      0.1926207810612187,
+      -1.0050166110782472,
+      0.0008895484032773737
+    ],
+    "fitness": 0.5285714285714286,
+    "rmse": 0.043195241455944104,
+    "csm_ratio": 1.1458821254848395,
+    "t_start_ns": 1789436449422493000,
+    "t_end_ns": 1789436626505633000,
+    "distance_m": 1.023308923952019
+  },
+  "fov_half_deg": 30.715794874160647,
+  "table_check_center": [
+    3.073203749152493,
+    -0.08589459445376292
+  ],
+  "time_offset_s": 0.1,
+  "v2_pose_report": {
+    "T_base_laser": [
+      [
+        1.0,
+        -0.0,
+        0.0,
+        0.125
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.025
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "n_scans": 1776,
+    "blur": {
+      "threshold": 1507.758577972412,
+      "percentile": 10.0,
+      "n_blurry": 270,
+      "n_frames": 2701,
+      "runs": [
+        [
+          706,
+          707
+        ],
+        [
+          735,
+          736
+        ],
+        [
+          747,
+          748
+        ],
+        [
+          773,
+          774
+        ],
+        [
+          780,
+          781
+        ],
+        [
+          798,
+          799
+        ],
+        [
+          801,
+          803
+        ],
+        [
+          828,
+          828
+        ],
+        [
+          831,
+          832
+        ],
+        [
+          834,
+          834
+        ],
+        [
+          836,
+          837
+        ],
+        [
+          858,
+          859
+        ],
+        [
+          885,
+          886
+        ],
+        [
+          889,
+          889
+        ],
+        [
+          944,
+          944
+        ],
+        [
+          948,
+          948
+        ],
+        [
+          955,
+          956
+        ],
+        [
+          958,
+          959
+        ],
+        [
+          1003,
+          1006
+        ],
+        [
+          1089,
+          1097
+        ],
+        [
+          1099,
+          1099
+        ],
+        [
+          1108,
+          1111
+        ],
+        [
+          1114,
+          1114
+        ],
+        [
+          1120,
+          1121
+        ],
+        [
+          1136,
+          1137
+        ],
+        [
+          1140,
+          1141
+        ],
+        [
+          1143,
+          1144
+        ],
+        [
+          1155,
+          1156
+        ],
+        [
+          1167,
+          1167
+        ],
+        [
+          1174,
+          1174
+        ],
+        [
+          1193,
+          1196
+        ],
+        [
+          1199,
+          1200
+        ],
+        [
+          1206,
+          1209
+        ],
+        [
+          1251,
+          1256
+        ],
+        [
+          1269,
+          1269
+        ],
+        [
+          1278,
+          1278
+        ],
+        [
+          1301,
+          1301
+        ],
+        [
+          1304,
+          1305
+        ],
+        [
+          1315,
+          1315
+        ],
+        [
+          1318,
+          1318
+        ],
+        [
+          1324,
+          1328
+        ],
+        [
+          1334,
+          1335
+        ],
+        [
+          1365,
+          1368
+        ],
+        [
+          1372,
+          1372
+        ],
+        [
+          1380,
+          1380
+        ],
+        [
+          1386,
+          1387
+        ],
+        [
+          1406,
+          1406
+        ],
+        [
+          1419,
+          1420
+        ],
+        [
+          1424,
+          1425
+        ],
+        [
+          1440,
+          1442
+        ],
+        [
+          1444,
+          1447
+        ],
+        [
+          1454,
+          1454
+        ],
+        [
+          1456,
+          1456
+        ],
+        [
+          1480,
+          1480
+        ],
+        [
+          1482,
+          1485
+        ],
+        [
+          1502,
+          1502
+        ],
+        [
+          1508,
+          1509
+        ],
+        [
+          1555,
+          1556
+        ],
+        [
+          1559,
+          1559
+        ],
+        [
+          1613,
+          1614
+        ],
+        [
+          1635,
+          1639
+        ],
+        [
+          1685,
+          1685
+        ],
+        [
+          1728,
+          1729
+        ],
+        [
+          1775,
+          1775
+        ],
+        [
+          1854,
+          1857
+        ],
+        [
+          2008,
+          2011
+        ],
+        [
+          2014,
+          2015
+        ],
+        [
+          2017,
+          2024
+        ],
+        [
+          2053,
+          2054
+        ],
+        [
+          2072,
+          2072
+        ],
+        [
+          2096,
+          2096
+        ],
+        [
+          2099,
+          2102
+        ],
+        [
+          2107,
+          2107
+        ],
+        [
+          2115,
+          2117
+        ],
+        [
+          2122,
+          2126
+        ],
+        [
+          2134,
+          2148
+        ],
+        [
+          2150,
+          2150
+        ],
+        [
+          2167,
+          2167
+        ],
+        [
+          2176,
+          2178
+        ],
+        [
+          2181,
+          2181
+        ],
+        [
+          2183,
+          2184
+        ],
+        [
+          2187,
+          2189
+        ],
+        [
+          2191,
+          2192
+        ],
+        [
+          2195,
+          2195
+        ],
+        [
+          2199,
+          2201
+        ],
+        [
+          2206,
+          2209
+        ],
+        [
+          2216,
+          2219
+        ],
+        [
+          2230,
+          2231
+        ],
+        [
+          2234,
+          2234
+        ],
+        [
+          2240,
+          2241
+        ],
+        [
+          2287,
+          2290
+        ],
+        [
+          2298,
+          2301
+        ],
+        [
+          2305,
+          2310
+        ],
+        [
+          2312,
+          2312
+        ],
+        [
+          2314,
+          2314
+        ],
+        [
+          2316,
+          2320
+        ],
+        [
+          2324,
+          2324
+        ],
+        [
+          2334,
+          2334
+        ],
+        [
+          2343,
+          2345
+        ],
+        [
+          2475,
+          2478
+        ],
+        [
+          2560,
+          2560
+        ],
+        [
+          2566,
+          2567
+        ],
+        [
+          2595,
+          2595
+        ],
+        [
+          2598,
+          2598
+        ],
+        [
+          2617,
+          2618
+        ],
+        [
+          2621,
+          2621
+        ],
+        [
+          2623,
+          2623
+        ],
+        [
+          2626,
+          2628
+        ],
+        [
+          2639,
+          2639
+        ],
+        [
+          2646,
+          2646
+        ],
+        [
+          2648,
+          2649
+        ],
+        [
+          2667,
+          2672
+        ],
+        [
+          2697,
+          2697
+        ]
+      ],
+      "longest_run_frames": 15,
+      "blurry_in_1850_2475": 107
+    },
+    "sharp_odometry": {
+      "pairs": 2430,
+      "failures": 16,
+      "icp_fallbacks": 39
+    },
+    "ground_z_world": -0.7678850149740994,
+    "body_sector_deg": [
+      [
+        -135.0,
+        -85.0
+      ],
+      [
+        -75.0,
+        -55.0
+      ],
+      [
+        60.0,
+        75.0
+      ],
+      [
+        120.0,
+        135.0
+      ]
+    ],
+    "body_sector_max_persistence": 1.0,
+    "scans_constraint": 888,
+    "scans_heldout": 888,
+    "calibration": {
+      "time_peak": {
+        "consistency": {
+          "best": 0.1,
+          "contrast": 0.15965476330351147,
+          "local_minima": 1,
+          "clear_single_peak": true
+        },
+        "mesh": {
+          "best": 0.14,
+          "contrast": 0.004881544379320659,
+          "local_minima": 4,
+          "clear_single_peak": false
+        }
+      },
+      "time_offset_adopted": true,
+      "time_offset_s": 0.1,
+      "yaw_peak": {
+        "consistency": {
+          "best": -1.0,
+          "contrast": 0.014995298573508259,
+          "local_minima": 1,
+          "clear_single_peak": false
+        },
+        "mesh": {
+          "best": -9.0,
+          "contrast": 0.0024987846788209725,
+          "local_minima": 1,
+          "clear_single_peak": false
+        }
+      },
+      "yaw_warning": false,
+      "yaw_applied": false
+    },
+    "rotation_lidar_vs_visual": {
+      "segment_s": 30.0,
+      "per_segment_deg_lidar_visual": {
+        "0": [
+          5.4,
+          6.7
+        ],
+        "30": [
+          -201.5,
+          -162.6
+        ],
+        "60": [
+          -95.3,
+          -72.2
+        ],
+        "90": [
+          101.4,
+          73.4
+        ],
+        "120": [
+          75.3,
+          52.1
+        ],
+        "150": [
+          47.3,
+          46.8
+        ]
+      },
+      "abs_ratio": 1.2715876610361692
+    },
+    "camera_lidar_lateral_scale": {
+      "pairs": 435,
+      "scales": [
+        0.8,
+        0.85,
+        0.9,
+        0.95,
+        1.0,
+        1.05,
+        1.1,
+        1.15,
+        1.2,
+        1.25,
+        1.3,
+        1.35,
+        1.4
+      ],
+      "cost": [
+        0.0513844818237865,
+        0.04916539585324023,
+        0.049105204010836644,
+        0.0475596615208494,
+        0.04869635081329147,
+        0.04693087461472114,
+        0.045826903671498,
+        0.044940126323129916,
+        0.04594093395315291,
+        0.04709069601344423,
+        0.053026626352626026,
+        0.05607904713842936,
+        0.06061904473558407
+      ],
+      "peak": {
+        "best": 1.15,
+        "contrast": 0.11137899441504766,
+        "local_minima": 1,
+        "clear_single_peak": true
+      },
+      "implied_fx": 481.5452509341033,
+      "fx_camera_info": 553.7770385742188
+    },
+    "lidar_keyframes": 76,
+    "lidar_adjacent": {
+      "accepted": 71,
+      "rejected": {
+        "icp_failed": 0,
+        "fitness": 1,
+        "rmse": 0,
+        "correction": 3
+      },
+      "correction_vs_visual_median_m": 0.053590042736930146,
+      "correction_vs_visual_median_deg": 2.0368739156587696
+    },
+    "visual_loops_v1": 334,
+    "variants": {
+      "v1_se2": {
+        "nodes": 2701,
+        "visual_odometry_edges": 2700,
+        "visual_loop_edges": 334,
+        "visual_loop_audit": null,
+        "flags": {
+          "blur_removal": false,
+          "audit_visual_loops": false,
+          "lidar_adjacent": false,
+          "lidar_loops": false
+        },
+        "lidar_adjacent_edges": 0,
+        "lidar_loop_edges": 0,
+        "lidar_loop_stats": null,
+        "head_tail_m": 0.10550665495517854,
+        "graph": {
+          "cost": 1581.4028302316378,
+          "nfev": 70,
+          "status": 2,
+          "graph_nodes": 271,
+          "whitened_residual_median_by_type": {
+            "vis_loop": 2.024741134794893,
+            "vis_odo": 0.6668222014687879
+          }
+        }
+      },
+      "lidar_adj": {
+        "nodes": 2701,
+        "visual_odometry_edges": 2700,
+        "visual_loop_edges": 334,
+        "visual_loop_audit": null,
+        "flags": {
+          "blur_removal": false,
+          "audit_visual_loops": false,
+          "lidar_adjacent": true,
+          "lidar_loops": false
+        },
+        "lidar_adjacent_edges": 71,
+        "lidar_loop_edges": 0,
+        "lidar_loop_stats": null,
+        "head_tail_m": 0.10466128440890216,
+        "graph": {
+          "cost": 2009.8985233490025,
+          "nfev": 83,
+          "status": 2,
+          "graph_nodes": 271,
+          "whitened_residual_median_by_type": {
+            "lidar_adj": 1.62249563424847,
+            "vis_loop": 2.0547349047151666,
+            "vis_odo": 1.0220490498276944
+          }
+        }
+      },
+      "lidar_loops": {
+        "nodes": 2701,
+        "visual_odometry_edges": 2700,
+        "visual_loop_edges": 334,
+        "visual_loop_audit": null,
+        "flags": {
+          "blur_removal": false,
+          "audit_visual_loops": false,
+          "lidar_adjacent": true,
+          "lidar_loops": true
+        },
+        "lidar_adjacent_edges": 71,
+        "lidar_loop_edges": 51,
+        "lidar_loop_stats": {
+          "candidates": 229,
+          "accepted": 51,
+          "rej_match": 56,
+          "rej_ambiguous": 100,
+          "rej_visual_inconsistent": 22
+        },
+        "head_tail_m": 0.10462763500222313,
+        "graph": {
+          "cost": 2229.5808254973485,
+          "nfev": 91,
+          "status": 2,
+          "graph_nodes": 271,
+          "whitened_residual_median_by_type": {
+            "lidar_adj": 1.2527354696188782,
+            "lidar_loop": 1.1094828280025009,
+            "vis_loop": 2.0833101366138753,
+            "vis_odo": 1.0909320654477974
+          }
+        }
+      },
+      "lidar_loops_blur": {
+        "nodes": 2431,
+        "visual_odometry_edges": 2430,
+        "visual_loop_edges": 309,
+        "visual_loop_audit": null,
+        "flags": {
+          "blur_removal": true,
+          "audit_visual_loops": false,
+          "lidar_adjacent": true,
+          "lidar_loops": true
+        },
+        "lidar_adjacent_edges": 71,
+        "lidar_loop_edges": 55,
+        "lidar_loop_stats": {
+          "candidates": 229,
+          "accepted": 55,
+          "rej_match": 56,
+          "rej_ambiguous": 103,
+          "rej_visual_inconsistent": 15
+        },
+        "head_tail_m": 0.09154702339509255,
+        "graph": {
+          "cost": 2017.290602797279,
+          "nfev": 138,
+          "status": 2,
+          "graph_nodes": 244,
+          "whitened_residual_median_by_type": {
+            "lidar_adj": 1.2078370845716926,
+            "lidar_loop": 0.8785635397267937,
+            "vis_loop": 2.036108865489277,
+            "vis_odo": 1.0959236984933836
+          }
+        }
+      },
+      "full": {
+        "nodes": 2431,
+        "visual_odometry_edges": 2430,
+        "visual_loop_edges": 218,
+        "visual_loop_audit": {
+          "kept": 79,
+          "rejected": 91,
+          "inconclusive_downweighted": 139,
+          "dropped_blurry_endpoint": 25
+        },
+        "flags": {
+          "blur_removal": true,
+          "audit_visual_loops": true,
+          "lidar_adjacent": true,
+          "lidar_loops": true
+        },
+        "lidar_adjacent_edges": 71,
+        "lidar_loop_edges": 59,
+        "lidar_loop_stats": {
+          "candidates": 230,
+          "accepted": 59,
+          "rej_match": 60,
+          "rej_ambiguous": 104,
+          "rej_visual_inconsistent": 7
+        },
+        "head_tail_m": 0.10411918645654243,
+        "graph": {
+          "cost": 819.676321532829,
+          "nfev": 109,
+          "status": 2,
+          "graph_nodes": 244,
+          "whitened_residual_median_by_type": {
+            "lidar_adj": 0.9364086595627685,
+            "lidar_loop": 0.7374381063361731,
+            "vis_loop": 0.9387721289096028,
+            "vis_odo": 1.0162250370288834
+          }
+        }
+      }
+    }
+  },
+  "table_detection": {
+    "v1": {
+      "center": [
+        3.073203749152493,
+        -0.08589459445376292
+      ],
+      "radius": 0.31640877114032256,
+      "top_z": 0.9918567372714283,
+      "points": 343
+    },
+    "lidar_loops": {
+      "center": [
+        3.052630679156539,
+        -0.13836282813180184
+      ],
+      "radius": 0.4186531244236029,
+      "top_z": 0.9843221061688963,
+      "points": 780
+    }
+  },
+  "extra_voxel": {
+    "voxel": 0.015,
+    "dir": "/home/user/drone-ranger-stack/experiments/2026-10-rgbd-lidar-sync/outputs/v2/vox015",
+    "mesh_report": {
+      "raw_triangles": 3929847,
+      "raw_vertices": 3028942,
+      "after_clean_triangles": 3929845,
+      "clusters": 280755,
+      "clusters_kept": 48,
+      "area_kept_ratio": 0.3686034717942498,
+      "after_cluster_triangles": 1146365,
+      "ground_planes": [
+        {
+          "normal": [
+            0.010296868798092565,
+            0.0004902360128922871,
+            0.9999468656691748
+          ],
+          "d": 0.787304861787142,
+          "inliers": 77085,
+          "angle_deg": 0.5906458555845064
+        },
+        {
+          "normal": [
+            0.01347962479957945,
+            0.0027926932561960576,
+            0.9999052458006406
+          ],
+          "d": 0.7308008730301362,
+          "inliers": 25304,
+          "angle_deg": 0.7887516717449262
+        },
+        {
+          "normal": [
+            0.002695982750947419,
+            0.07256880702590265,
+            0.9973597645402806
+          ],
+          "d": -1.664135174443956,
+          "inliers": 14820,
+          "angle_deg": 4.16442034582484
+        },
+        {
+          "normal": [
+            0.01184713092485781,
+            0.004020177150645328,
+            0.9999217387698534
+          ],
+          "d": 0.8264746540954879,
+          "inliers": 20674,
+          "angle_deg": 0.7168260799591877
+        },
+        {
+          "normal": [
+            0.058143019877841144,
+            0.06074472740430217,
+            0.9964584624218222
+          ],
+          "d": -1.8727524435028697,
+          "inliers": 10875,
+          "angle_deg": 4.8234947839816495
+        }
+      ],
+      "ground": {
+        "normal_before": [
+          0.010296868798092565,
+          0.0004902360128922871,
+          0.9999468656691748
+        ],
+        "tilt_corrected_deg": 0.5906458555845064,
+        "inliers": 77085,
+        "camera_height_median_m": 0.8055597372723534
+      },
+      "target_triangles_used": 200000,
+      "triangles": 200000,
+      "vertices": 106570,
+      "file_sizes_mb": {
+        "mesh_clean.ply": 8.035396,
+        "mesh_clean.obj": 14.512619
+      },
+      "bbox_min": [
+        -1.901994693368991,
+        -3.4848435277232976,
+        -0.28850540439080274
+      ],
+      "bbox_max": [
+        6.568012888392013,
+        4.417311861177596,
+        3.1955220414214844
+      ],
+      "T_align": [
+        [
+          0.9999469858380414,
+          -2.5240150083501784e-06,
+          -0.010296868798092565,
+          0.0
+        ],
+        [
+          -2.5240150083501784e-06,
+          0.9999998798311333,
+          -0.0004902360128922871,
+          0.0
+        ],
+        [
+          0.010296868798092565,
+          0.0004902360128922871,
+          0.9999468656691747,
+          0.787304861787142
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "watertight": false
+    }
+  },
+  "notes": "held-out scans (odd index) were never used as constraints; metrics on all variants use the same held-out scans, the same depth frames and the same time offset"
+}

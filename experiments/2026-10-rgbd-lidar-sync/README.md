@@ -1,4 +1,7 @@
-# 2026-10 RGB-D + 2D LiDAR → TSDF mesh → OBJ / 带碰撞的 USD（离线流水线 v1）
+# 2026-10 RGB-D + 2D LiDAR → TSDF mesh → OBJ / 带碰撞的 USD（离线流水线 v1 + v2）
+
+> v1：RGB-D 视觉 odometry + 地面约束 + Open3D 位姿图（下文前半部分，结果在 `results/`）。
+> v2：在 v1 之上加入 2D LiDAR 约束（x/y/yaw），结果在 `results/v2/`，见文末 **v2** 一章。
 
 手持 OAK-D（RGB + 设备端对齐深度）+ YDLIDAR T-mini Plus，在户外院子绕一张桌子走一圈（约 3 min）录制的
 ROS 2 Humble rosbag，离线重建为三角网格，并导出 Isaac Sim 可直接使用的静态碰撞 USD。
@@ -42,6 +45,7 @@ python3.12 -m venv .venv          # open3d 0.19 只有 3.10–3.12 的 wheel（3
 ./run_all.sh --from 3             # 从某个阶段继续
 .venv/bin/python scripts/03_estimate_poses.py --config configs/default.yaml   # 单独跑某一阶段
 .venv/bin/python scripts/verify_usd.py outputs/usd/scene_collision.usdc
+./run_v2.sh                       # v2（需先跑完 v1）：03b → 04–07 → 08 消融评估 → 09 Isaac 测试场景
 ```
 
 私有 HF 仓库：`export HF_TOKEN=...`。所有路径、topic、frame 名、参数都在 `configs/default.yaml`。
@@ -187,3 +191,152 @@ depth_trunc = `extract.depth_max`（5 m）。
 
 `results/` 中的文件：`scene_collision.usdc`、`mesh_clean.obj`、`mesh_clean.ply`、`trajectory_topdown.png`、
 `lidar_vs_mesh.png`、`report.json`（01）、`pose_report.json`（03）。均 < 90 MB，未触发自动减面。
+
+
+---
+
+# v2：加入 2D LiDAR 约束（x / y / yaw）
+
+```
+v1 checkpoints (odometry, ground planes, visual loops) ──► 03b_lidar_refine ──► outputs/v2/poses (+ ablation/<variant>/poses)
+                                                              │  blur 剔除 · LiDAR 预处理 · 标定诊断 · SE(2) 位姿图
+                                                              ▼
+                                      04 → 05 → 06 → 07（configs/v2.yaml：outputs/v2/，results/v2/）
+                                                              ▼
+                               08_evaluate_v2（每个变体建网格 + 留出评估 + 对比图） → 09_test_scene（Isaac 掉落测试）
+```
+
+所有 v2 参数在 `configs/v2.yaml`（`base: default.yaml` 继承 v1 配置，只写差异）；任何脚本都可用
+`--set key=value` 临时覆盖参数（08 用它给每个消融变体建网格）。v1 的 `results/` 不受影响。
+
+## 方法
+
+**解耦优化**：roll / pitch / z 来自 v1 的地面平面约束（每帧 RANSAC 地面），保持不变；
+x / y / yaw 在 SE(2) 位姿图中重新估计，最后合回 6DoF：`T_world_base = [Rz(yaw)·R_rp, (x, y, z)]`，
+`T_world_optical = T_world_base · T_base_optical`。
+
+为什么用 SE(2) + `scipy.optimize.least_squares` 而不是 Open3D 6DoF PoseGraph：LiDAR 只约束平面内 3 个自由度，
+在 Open3D 里要把 roll/pitch/z 方向的信息置零，信息矩阵会奇异/病态，且 Open3D 的 line process 只对
+“uncertain” 边做鲁棒化；scipy 版本可以对所有边统一用 Cauchy 核，并且残差/雅可比完全可控。
+
+**一个实现上的坑（已修）**：最初在全部 2701 个位姿上直接优化，`trf + lsmr` 在 100 次评估内几乎不动
+（status=0，视觉回环残差中位 15σ）；改为**关键帧图**：每 `pg_node_stride=10` 个位姿一个节点，节点间的
+视觉 odometry 由链精确复合（σ 按 √步数增长），其他测量按“最近节点 + 链上偏移”挂到节点上，
+优化后把每个节点的修正量 `X_n ∘ init_n⁻¹` 按时间插值回每一帧；`tr_solver=exact`，所有变体都收敛（status=2）。
+
+边类型与 σ（`configs/v2.yaml`）：视觉 odometry 0.5 cm / 0.25° 每步（失败外推步 ×10）、视觉回环 5 cm / 1°、
+LiDAR 相邻 2 cm / 0.5°、LiDAR 回环 5 cm / 1°；Cauchy，`f_scale=2`（白化残差）。
+
+### 1. 模糊帧
+每帧灰度 Laplacian 方差，阈值 = 全序列 10 分位（1507.8）：**270 帧**被标为模糊，分布在 113 段，
+最长一段 15 帧；其中 107 帧落在 v1 发现的问题段 1850–2475（各 300 帧区间：0,0,26,42,52,17,23,83,27,0）。
+模糊帧不做 odometry 匹配源（清晰帧之间重新做 odometry：2430 对，复用 v1 2317 对，ICP 兜底 39、外推失败 16）、
+不进 TSDF（`poses.npz` 里的 `tsdf_mask`），位姿由相邻清晰帧插值。
+
+### 2. LiDAR 预处理
+- 范围 r ∈ [0.6, 8.0] m；外参固定为实测 `T_base_laser = (0.125, 0, 0.025), yaw 0`（`lidar.T_base_laser`，不再用 /tf_static）。
+- “操作者身体”自动检测（5° 扇区内近距离回波 < 1 m 出现在 ≥ 50% 的 scan 中）：得到
+  **[−135°, −85°]、[−75°, −55°]、[60°, 75°]、[120°, 135°]**。这些扇区的近距离回波中位距离只有 **0.06–0.22 m**，
+  持续率达 100%，说明它们是**设备自身结构遮挡**（支架/手柄/相机壳），不是操作者；0.6–1 m 范围内没有任何扇区
+  持续出现回波（其余扇区最高 0.32），即没检测到稳定的“人体”扇区。这些扇区整体剔除。
+- 投影：scan 时刻（stamp + time_offset）在相机轨迹上插值，用该时刻已修正的 roll/pitch 把点变到水平化 base 系，
+  丢掉离地 < 0.2 m 或 > 2.0 m 的点，取 xy。
+- scan 按索引奇偶交替分成两份：**偶数用于约束，奇数只用于评估**（888 / 888）。
+
+### 3. 标定网格搜索（诊断）
+- **time_offset ∈ [−0.3, 0.3] s**：目标函数 = 相隔 1 s 的 scan 在轨迹投影下的互相一致性。曲线单峰、
+  最优 **+0.10 s**（对比度 16%）→ **已采用**。（以 v1 网格为参照的目标函数基本平坦，不可用。）
+- **yaw_offset ∈ [−10°, 10°]**：一致性目标几乎平坦（对比度 1.5%）、网格目标单调到边界（−9°/−10°）→
+  **没有清晰峰，不提示修改，config 保持 0°**。另做了“同一时刻深度切片 vs scan”的无轨迹配准，也看不到大的 yaw 偏差。
+- 曲线：`results/v2/lidar_calib.png`。
+
+### 4. LiDAR 约束
+- 关键帧：每 0.3 m 或 10°（共 76 个），每个关键帧用前后各 2 个约束 scan 拼成子图（视觉 odometry 局部精度足够）。
+- 相邻关键帧：2D point-to-line ICP（numpy/scipy KD-tree 自实现，Huber），以视觉 odometry 为初值；
+  接受 **71 / 75**（fitness 1、修正量过大 3 条被丢弃）。相对视觉 odometry 的修正中位 5.4 cm / **2.0°**。
+- 回环：候选 = 当前估计距离 < 1.5 m 且时间间隔 > 20 s，每关键帧最多 3 个；correlative scan matching
+  （±30°、±0.5 m，似然场）粗搜 + ICP 精配；接受条件：fitness ≥ 0.45、RMSE ≤ 5 cm、峰值唯一性（最优 / 峰外最优 ≥ 1.15）、
+  与附近视觉回环一致（0.3 m / 5°）。2 轮（第 2 轮用第 1 轮优化后的位姿重新找候选）。
+  `lidar_loops` 变体：候选 229，**接受 51**，匹配失败 56，**峰值不唯一 100**（户外栅栏/树叶重复结构），与视觉回环矛盾 22。
+- 视觉回环审计（`full`）：对 334 条 v1 视觉回环，在两端附近取约束 scan 子图，以视觉回环为初值 ICP（失败再 CSM）；
+  一致 → 保留，差 > 0.3 m / 5° → 剔除，LiDAR 无法确认 → σ×3 降权。结果：**保留 79、剔除 91、降权 139、
+  端点为模糊帧而丢弃 25**。
+
+### 5. 评估（避免自证）
+所有变体用**同一批留出 scan**（奇数索引，从未进入约束）、同一批深度帧（每 10 帧、非模糊）、同一个 time_offset：
+- `heldout_fov`：留出 scan 中**相机视场内**（|beam| ≤ 30°，由 K 算出）且 ≤ 4 m 的点到该变体网格的距离。
+  这是主指标：LiDAR 是 360°，视场外的点处没有网格，会被量到 0.8 m 下面的地面上，所以“全角度”版本
+  （`heldout_all`，也列出）对所有变体都约 0.4–0.5 m，几乎没有区分度。
+- `crisp`：留出 scan 在该变体轨迹下拼成的 2D 地图的锐度（每点到 > 20 s 之外的留出点的最近距离中位数）。
+- `closure`：用**留出 scan** 直接配准起点和终点（宽范围 CSM ±2 m/±45° + ICP，fitness 0.53）得到参考：
+  终点相对起点 **1.02 m**。closure = 估计的起点→终点相对位姿与该参考之差。
+  （首尾距离本身在这段录制里**不是误差指标**：采集者结束时离起点约 1 m。）
+- `slice_cells`：0.4–1.2 m 高度带投到 5 cm 栅格的占据格子数（越少越清晰）。
+- `table_tris`：原始 TSDF 网格中桌子区域的三角面数（桌子被不一致视角“掏空”时会骤降）。
+- `tilt`：倾角误差中位数。
+
+## 消融结果（真实数据，2026-10-21）
+
+| 变体 | heldout_fov 中位 / p90 [m] | heldout_all 中位 [m] | crisp [m] | closure xy [m] / yaw [°] | 首尾 [m] | slice_cells | table_tris | tilt [°] |
+|---|---|---|---|---|---|---|---|---|
+| v1（Open3D 6DoF PGO） | 0.309 / 0.595 | 0.489 | 0.026 | **0.50** / 11.1 | 1.43 | **5447** | 13147 | 0.72 |
+| v1_se2（同 v1 图，SE(2) 优化，无 LiDAR） | 0.404 / 0.731 | 0.433 | 0.028 | 1.11 / 2.1 | 0.11 | 5614 | 10660 | 0.59 |
+| lidar_adj（+ LiDAR 相邻边） | 0.232 / 0.680 | 0.515 | 0.023 | 1.10 / 1.9 | 0.11 | 5695 | 11494 | 0.61 |
+| **lidar_loops（+ LiDAR 回环）← 交付** | **0.198** / 0.603 | **0.410** | 0.019 | 1.12 / 1.2 | 0.11 | 5897 | **17156** | 0.68 |
+| lidar_loops_blur（+ 模糊剔除） | 0.766 / 0.869 | 0.645 | 0.018 | 1.09 / 1.7 | 0.09 | 5896 | **71** | 0.68 |
+| full（+ 模糊剔除 + 视觉回环审计） | 0.770 / 0.891 | 0.497 | **0.015** | 1.04 / **0.4** | 0.10 | 5832 | **518** | 0.66 |
+
+（`results/v2/report.json → ablation`；图：`slice_v1_vs_v2.png`、`slice_ablation.png`、`trajectory_comparison.png`、
+`lidar_overlay_v1_vs_v2.png`。）
+
+**交付选择**：`v2.final_variant: lidar_loops`（不是 `full`）。按留出指标选：相机视场内 LiDAR→网格距离
+从 0.309 降到 **0.198 m（−36%）**，LiDAR 地图更锐（0.026 → 0.019），桌子区域网格更完整（13147 → 17156 面），
+栅栏在叠加图里从双线变成单线。
+
+**没有改善 / 变差的地方（如实）**：
+1. **closure 变差**：v1 0.50 m → lidar_loops 1.12 m。所有 SE(2) 变体都把终点拉回起点附近（首尾 0.1 m），
+   而留出 LiDAR 测得终点离起点约 1 m。原因是 v1 中“第 0 帧 ↔ 2605–2665 帧”的一批视觉回环（户外重复纹理，
+   LiDAR 对这几对的 CSM 峰值唯一性只有 ≈1.0）在 SE(2) + Cauchy 下占了多数；v1 的 Open3D line process 剪掉了其中一部分。
+   lidar_loops 的轨迹在起点附近因此有几段明显的跳变（`trajectory_comparison.png`）。
+2. **slice_cells 没有变好**（5447 → 5897）。这个指标对深度噪声和视野外散点很敏感，和其他指标结论相反；我没有把它当主指标，但如实列出。
+3. **模糊剔除和视觉回环审计都让结果变差**：单独加模糊剔除（lidar_loops_blur）或单独加审计（离线实验：全部帧 + 审计，
+   table_tris 572）都会让桌子在 TSDF 里被“掏空”，heldout_fov 恶化到 0.77 m——虽然它们的 LiDAR 地图最锐（crisp 0.015–0.018）。
+   也就是说：**LiDAR 越占主导，相机视角之间越不一致**。
+4. `full` 对 LiDAR 回环的随机下采样敏感：两次运行（只是变体顺序不同）closure 分别为 0.28 m 和 1.04 m。
+5. 1.5 cm 体素（`eval.extra_voxel`，outputs/v2/vox015）：桌面/盆栽更密，**仍然没有桌腿**（`table_region_voxel.png`）。
+
+## 根因分析：LiDAR 与相机的旋转不一致
+
+逐 30 s 统计相邻 LiDAR 关键帧边的 yaw 与同区间视觉 odometry 的 yaw：
+
+| 时间段 [s] | 0 | 30 | 60 | 90 | 120 | 150 |
+|---|---|---|---|---|---|---|
+| LiDAR Σyaw [°] | 5 | −202 | −95 | +101 | +75 | +47 |
+| 视觉 Σyaw [°] | 7 | −163 | −72 | +73 | +52 | +47 |
+
+LiDAR 测到的转角系统性地比视觉 odometry 大约 **27%**（Σ|yaw| 比 1.27；与 time_offset 取 −0.3…+0.3 s 无关；
+镜像 scan 则完全不一致）。这正好解释了上面的现象：LiDAR 权重越大，相机朝向被“多转”，从桌子两侧看到的桌子位置对不上，
+TSDF 把它掏空。
+
+两个独立证据指向 **CameraInfo 的焦距偏大**（fx = 554）：
+- 无轨迹的“同一时刻深度切片 vs LiDAR scan”配准：把相机横向坐标缩放 s 后与 scan 的匹配度在 **s = 1.15** 处有清晰单峰
+  （对比度 11%）→ 隐含 **fx ≈ 482**（`report.json → v2_pose_report.camera_lidar_lateral_scale`）。
+  OAK-D 彩色相机 ~69° HFOV 在 640 px 宽时 fx ≈ 466，与此接近；554 对应 60° HFOV。
+- 在 450–1350 帧上用 fx/1.3 重算视觉 odometry：LiDAR/视觉转角比从 1.26 降到 1.17，相邻关键帧 yaw 差中位从 2.2° 降到 1.0°。
+  不过 fx 只能解释一部分（视觉 yaw 对 fx 不太敏感，深度几何项占主导），剩余差异原因未定。
+
+**我没有修改内参**：这和 yaw 外参一样属于标定决定，需要你确认。建议 v3：用棋盘格重新标定 OAK-D 彩色相机
+（或用 DepthAI 读取设备内参，核对 ROS 驱动发布的 CameraInfo 是否对应 640x400 输出），然后用新 K 重跑 02–03 和 v2。
+
+## Isaac Sim 测试场景
+`results/v2/test_drop.usda`（引用 `./scene_collision.usdc`，v2）和 `results/v2/test_drop_v1.usda`（引用 `../scene_collision.usdc`，v1），
+均由 usd-core 生成：`/World/PhysicsScene`（重力 −Z 9.81）、3 个 0.2 m 刚体立方体（RigidBody + Collision + Mass 1 kg）、
+`/World/DistantLight`，米制、Z 向上。立方体位置由网格中自动检测的桌子决定（v2：桌心 (3.05, −0.14)，半径 0.42 m），
+向下射线检查其下方表面：桌心立方体下方 z=0.98（桌面/盆栽），桌边下方 z=1.03，地面立方体下方 z=0.04；
+立方体初始高度为下方表面 + 1 m。在 Isaac Sim 中打开 usda 按 Play：红色立方体应停在桌上、蓝色在桌边、绿色落到地面。
+
+## v2 交付物（results/v2/）
+`scene_collision.usdc`、`mesh_clean.obj`、`mesh_clean.ply`（lidar_loops 变体，200k 三角面）、`test_drop.usda`、
+`test_drop_v1.usda`、`report.json`（消融表 + 全部诊断）、`pose_report.json`、`trajectory_topdown.png`、
+`trajectory_comparison.png`、`slice_v1_vs_v2.png`、`slice_ablation.png`、`lidar_overlay_v1_vs_v2.png`、
+`lidar_vs_mesh.png`（07）、`lidar_calib.png`、`table_region_voxel.png`。均 < 90 MB。

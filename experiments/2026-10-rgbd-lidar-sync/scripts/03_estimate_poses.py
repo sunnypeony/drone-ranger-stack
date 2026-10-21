@@ -548,7 +548,7 @@ def ate_rigid(A, B):
 
 def main():
     args = parse_args(__doc__)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     P, F = cfg["poses"], cfg["frames"]
     out = stage_dir(cfg, "poses")
     fdir, rows, intr = load_frames(cfg)

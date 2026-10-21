@@ -20,14 +20,35 @@ DEFAULT_CONFIG = EXP_DIR / "configs" / "default.yaml"
 def parse_args(description: str, extra=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=description)
     p.add_argument("--config", default=str(DEFAULT_CONFIG), help="path to YAML config")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="override a config value, e.g. --set tsdf.voxel_length=0.015 (YAML-parsed value)")
     if extra:
         extra(p)
     return p.parse_args()
 
 
-def load_config(path: str | Path) -> dict:
+def _deep_merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
+    """Load YAML; a top-level `base: other.yaml` key inherits (deep-merges) another config file."""
+    path = Path(path)
     with open(path) as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+    if cfg.get("base"):
+        cfg = _deep_merge(load_config(path.parent / cfg.pop("base")), cfg)
+    for item in overrides or []:
+        key, _, val = item.partition("=")
+        node = cfg
+        *parents, leaf = key.split(".")
+        for k in parents:
+            node = node.setdefault(k, {})
+        node[leaf] = yaml.safe_load(val)
+    return cfg
 
 
 def exp_path(p: str | Path) -> Path:
@@ -360,6 +381,31 @@ class StaticTF:
         return sorted(s)
 
 
+def T_base_laser_from_cfg(cfg: dict, static_tf: "StaticTF | None" = None) -> np.ndarray:
+    """Fixed, measured laser extrinsic from config (`lidar.T_base_laser`: [x, y, z, yaw_deg]) if set,
+    otherwise base->laser from /tf_static."""
+    fixed = cfg.get("lidar", {}).get("T_base_laser")
+    if fixed is not None:
+        x, y, z, yaw = fixed
+        c, s = np.cos(np.radians(yaw)), np.sin(np.radians(yaw))
+        return make_T(np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]]), [x, y, z])
+    if static_tf is None:
+        die("no fixed lidar.T_base_laser in config and no /tf_static given")
+    T = static_tf.lookup(cfg["frames"]["base"], cfg["frames"]["laser"])
+    if T is None:
+        die("base->laser missing in /tf_static")
+    return T
+
+
+def lidar_time_offset_s(cfg: dict) -> float:
+    """`lidar.time_offset_s`: a number, or "auto" = value adopted by 03b (outputs/<tree>/poses/lidar_calib.json)."""
+    v = cfg["lidar"].get("time_offset_s", 0.0)
+    if v != "auto":
+        return float(v)
+    p = stage_dir(cfg, "poses") / "lidar_calib.json"
+    return float(json.load(open(p))["time_offset_s"]) if p.exists() else 0.0
+
+
 def load_static_tf(reader, typestore, cfg) -> StaticTF:
     st = StaticTF(cfg["frames"].get("tf_static_policy", "first"))
     for _, msg in iter_topic(reader, typestore, cfg["topics"]["tf_static"]):
@@ -412,9 +458,15 @@ def coverage(query_ns: np.ndarray, times: np.ndarray, max_gap_ns: int) -> float:
 
 
 # ----------------------------------------------------------------------------- frames dataset
+def frames_dir(cfg: dict) -> Path:
+    """Extracted frames can be shared between output trees (v2 reuses the v1 frames)."""
+    fd = cfg["paths"].get("frames_dir")
+    return exp_path(fd) if fd else stage_dir(cfg, "frames")
+
+
 def load_frames(cfg: dict):
     import csv
-    d = stage_dir(cfg, "frames")
+    d = frames_dir(cfg)
     rows = list(csv.DictReader(open(d / "frames.csv")))
     intr = json.load(open(d / "intrinsics.json"))
     return d, rows, intr

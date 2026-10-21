@@ -4,3 +4,4 @@ outputs/
 !results/
 !results/*.ply
 *.log
+!results/**/*.ply

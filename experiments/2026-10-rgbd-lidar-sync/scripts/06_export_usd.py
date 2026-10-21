@@ -42,7 +42,7 @@ def write_stage(path, V, F, N, C, cfg, approximation):
 def main():
     import open3d as o3d
     args = parse_args(__doc__)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     U = cfg["usd"]
     out = stage_dir(cfg, "usd")
     mdir = stage_dir(cfg, "mesh")
@@ -81,15 +81,23 @@ def collect_results(cfg, usd_path):
     res = exp_path(cfg["paths"]["results_dir"])
     res.mkdir(parents=True, exist_ok=True)
     o = exp_path(cfg["paths"]["outputs_dir"])
-    copies = {
+    required = {
         usd_path: res / usd_path.name,
         o / "mesh" / "mesh_clean.obj": res / "mesh_clean.obj",
         o / "mesh" / "mesh_clean.ply": res / "mesh_clean.ply",
+    }
+    optional = {  # produced by 01/03 of the same output tree; v2 writes its own report instead
         o / "poses" / "trajectory_topdown.png": res / "trajectory_topdown.png",
         o / "inspect" / "report.json": res / "report.json",
         o / "poses" / "pose_report.json": res / "pose_report.json",
     }
     limit = cfg["mesh"]["max_result_file_mb"] * 1e6
+    copies = dict(required)
+    for src, dst in optional.items():
+        if src.exists():
+            copies[src] = dst
+        else:
+            print(f"[results] optional {src} not present, skipped")
     for src, dst in copies.items():
         if not src.exists():
             die(f"missing deliverable {src}")

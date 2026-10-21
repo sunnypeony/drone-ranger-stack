@@ -10,7 +10,7 @@ import shutil
 import numpy as np
 from tqdm import tqdm
 
-from common import (die, exp_path, find_bag_dir, get_typestore, interp_T, iter_topic, load_config,
+from common import (T_base_laser_from_cfg, die, lidar_time_offset_s, exp_path, find_bag_dir, get_typestore, interp_T, iter_topic, load_config,
                     load_static_tf, open_reader, parse_args, stage_dir, stamp_ns, write_json)
 
 
@@ -20,7 +20,7 @@ def main():
     import matplotlib.pyplot as plt
     import open3d as o3d
     args = parse_args(__doc__)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     L, F = cfg["lidar"], cfg["frames"]
     out = stage_dir(cfg, "lidar")
     mdir = stage_dir(cfg, "mesh")
@@ -31,12 +31,12 @@ def main():
     with open_reader(find_bag_dir(cfg)) as reader:
         st = load_static_tf(reader, ts, cfg)
         T_bo = st.lookup(F["base"], F["camera_optical"])
-        T_bl = st.lookup(F["base"], F["laser"])
-        if T_bo is None or T_bl is None:
-            die("need base->optical and base->laser in /tf_static")
+        if T_bo is None:
+            die("need base->optical in /tf_static")
+        T_bl = T_base_laser_from_cfg(cfg, st)
         T_ol = np.linalg.inv(T_bo) @ T_bl  # optical <- laser
         gap = int(cfg["poses"]["tf_interp_max_gap_s"] * 1e9)
-        off = int(L["max_time_offset_s"] * 1e9)
+        off = int(lidar_time_offset_s(cfg) * 1e9)
         pts, rngs, heights, n_scan, n_used = [], [], [], 0, 0
         for i, (_, msg) in enumerate(tqdm(iter_topic(reader, ts, cfg["topics"]["scan"]), desc="scan")):
             n_scan += 1
@@ -72,7 +72,7 @@ def main():
            "points_compared": int(near.sum()), "compare_range_m": [L["range_min"], L["compare_range_max"]],
            "laser_height_median_m": h, "laser_height_std_m": float(np.std(heights)),
            "dist_to_mesh_median_m": float(np.median(d)), "dist_to_mesh_p90_m": float(np.percentile(d, 90)),
-           "mesh_slice_points": int(len(sl)), "time_offset_s": L["max_time_offset_s"],
+           "mesh_slice_points": int(len(sl)), "time_offset_s": lidar_time_offset_s(cfg),
            "T_base_laser": T_bl.tolist()}
     write_json(out / "lidar_report.json", rep)
     print(json.dumps(rep, indent=2))

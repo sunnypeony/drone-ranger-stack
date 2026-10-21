@@ -170,6 +170,7 @@ lidar:
   range_max: 12.0
   compare_range_max: 4.0       # m; distance metric only where the RGB-D mesh can exist
   slice_half_thickness: 0.05   # m, mesh slice around the laser plane height
-  max_time_offset_s: 0.0       # added to scan stamp before trajectory lookup
+  time_offset_s: 0.0           # s, added to scan stamp before trajectory lookup
+  T_base_laser: null           # [x, y, z, yaw_deg] fixed measured extrinsic; null = use /tf_static
   plot_extent_margin: 1.0
   max_points_plot: 200000

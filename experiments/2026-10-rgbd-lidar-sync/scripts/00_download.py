@@ -51,7 +51,7 @@ def extract(archive: Path, dest: Path, cfg) -> None:
 
 def main():
     args = parse_args(__doc__)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     dl = cfg["download"]
     raw = exp_path(cfg["paths"]["raw_dir"])
     raw.mkdir(parents=True, exist_ok=True)
