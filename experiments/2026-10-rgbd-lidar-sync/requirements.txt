@@ -9,3 +9,4 @@ huggingface_hub==2.2.0
 usd-core==26.8
 tqdm==4.70.1
 scipy==1.18.1                      # Slerp / quaternion conversion
+threadpoolctl==3.7.0                # per-step OpenMP thread limits (runtime.omp_threads)

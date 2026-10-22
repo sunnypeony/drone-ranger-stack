@@ -40,13 +40,17 @@ typestore: ROS2_HUMBLE
 cutoff_s: null
 
 runtime:
-  omp_num_threads: null        # OpenMP threads for Open3D (null = library default = all cores)
-  omp_auto_max: 4              # "auto" = min(CPU count, this)
-  omp_threads_by_script:       # per-script override (stem of the script name); int | auto | null
-    # RGB-D odometry: 0.24 s/pair at 1 thread vs 2.2 s at 32 threads on a 32-core host (oversubscribed);
-    # on the 4-vCPU cloud VM 4 threads are as fast or faster (0.34 vs 0.40 s/pair). auto caps at 4.
-    03_estimate_poses: auto
-    03b_lidar_refine: auto
+  # OpenMP threads per pipeline step (Open3D). int = threads, capped at the CPU count; null = Open3D's
+  # own default. Each script's main step is applied as OMP_NUM_THREADS at start-up (common.SCRIPT_STEP);
+  # OMP_NUM_THREADS in the caller's environment overrides every step.
+  # Defaults = median-fastest in scripts/bench_threads.py on the lab host (Xeon w5-2465X, 16 cores /
+  # 32 threads, 3 repeats; README "OpenMP 线程数（按步骤）"). Re-measure on other hosts
+  # (bench_threads.py) and override with --set runtime.omp_threads.<step>=N.
+  omp_threads:
+    odometry: 1                 # RGB-D odometry (+ geometric check / ICP fallback), 03 / 03b: 0.25 s/pair; 32 thr 1.7 s
+    loop_registration: 1        # colored-ICP loops (03), FPFH+RANSAC+ICP (check_head_tail, pf_loop_edges)
+    tsdf: 16                    # ScalableTSDF integration (04, eval_poses): = physical cores; 32 threads is 3.6x slower
+    mesh: null                  # 05 clean-up / clusters / decimation: 26-29 s at any count (mostly serial)
 
 inspect:
   sample_frame_index: 50       # which matched RGB-D pair to dump (clamped to available)
@@ -266,3 +270,21 @@ table_check:                   # scripts/table_check.py: ray-cast coverage of th
   coverage_radius_frac: 0.7    # disk of this fraction of the detected table radius
   grid: 0.02                   # m between rays
   map_half_width: 1.0          # m, height-map window for the figure
+
+bench:                         # scripts/bench_threads.py: OpenMP threads per step (and process x thread)
+  threads: [1, 4, 8, 16, 32]
+  repeats: 3                   # every setting, round-robin; median + range reported
+  max_busy_cores: 2.0          # refuse to start if other work keeps more cores than this busy
+  odometry_start: 1000         # extracted-frame index of the first pair
+  odometry_pairs: 50
+  loop_cache: outputs/poses/ckpt_loops.json   # v1 loop cache: real loop pairs + their transforms
+  loop_pairs: 10
+  loop_pick_stride: 37         # spread the picked pairs over the cache
+  fpfh_head: 0                 # pose-free registration pairs (check_head_tail.Registrar)
+  fpfh_tails: [2545, 2551, 2557]
+  tsdf_start: 1000             # posed-frame index of the first integrated frame
+  tsdf_frames: 200
+  mesh_raw: outputs/tsdf/mesh_raw.ply
+  mechanism_check_threads: [1, 8]    # runtime-switch check per step: rt 1 vs env 1, env 1 + rt 8 vs env 8
+  pool_steps: [odometry_pool, loop_pool]
+  pool_combos: [[1, 32], [2, 16], [4, 8], [8, 4], [16, 2], [32, 1]]   # [processes, threads per process]

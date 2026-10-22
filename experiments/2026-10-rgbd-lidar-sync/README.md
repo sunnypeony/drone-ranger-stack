@@ -417,8 +417,9 @@ pf_loop_edges（免位姿回环边，约束组 / 评估组） → 03b（消融�
 - **模糊**：Laplacian 方差 < 全序列 10 分位（1520）→ 263 帧，位姿插值，不进 TSDF（`tsdf_mask`）。
 - **LiDAR**：外参固定 (0.125, 0, 0.025)、旋转单位阵；time_offset 网格搜索单峰清晰 → 采用 **+0.06 s**（v2 为 +0.10 s）；
   yaw 无清晰峰，保持 0。只加相邻关键帧 x/y/yaw 边（73 关键帧，接受 68）。
-- **OpenMP 线程按脚本设置**（`runtime.omp_threads_by_script`）：此前全局 1 线程的修复让 TSDF 积分从 1/60 s 变成 2.4 s 每帧；
-  现在只有 03 / 03b 用 1 线程。
+- **OpenMP 线程**：当时改为按脚本设置（`runtime.omp_threads_by_script`），理由“全局 1 线程让 TSDF 积分从 1/60 s 变成
+  2.4 s 每帧”**是错误的测量**（那次积分与另一个多线程任务同时运行）；空闲机器上单线程只慢约 2.5 倍。
+  现已改为按步骤设置并实测，见文末“OpenMP 线程数（按步骤）”。
 
 ## 消融（0–175 s，留出指标；`results/v3/compare.json`、`table_check.json`）
 
@@ -460,3 +461,59 @@ pf_loop_edges（免位姿回环边，约束组 / 评估组） → 03b（消融�
 `test_drop.usda`（引用 `./scene_collision.usdc`）、`test_drop_v1.usda`（引用 v1 的 `../scene_collision.usdc`）、`compare.json`、
 `table_check.json/png`、`loop_edges.json/png`、`v3_pose_report.json`、`pose_report.json`、`trajectory_topdown.png`、`lidar_calib.png`、
 `lidar_vs_mesh.png`、`test_scene_report.json`。
+
+---
+
+# OpenMP 线程数（按步骤）
+
+`configs/default.yaml → runtime.omp_threads.{odometry, loop_registration, tsdf, mesh}`；测量脚本 `scripts/bench_threads.py`
+（参数在 `bench:`），结果 `outputs/bench/threads.json`。
+
+**机制**：Open3D 的部分代码（ScalableTSDF 积分、05 的网格处理）只认**进程启动时**的 `OMP_NUM_THREADS`，
+对之后的 `omp_set_num_threads`/threadpoolctl 无反应。因此每个脚本按其主步骤（`common.SCRIPT_STEP`：03/03b → odometry，
+04/eval_poses → tsdf，05 → mesh，check_head_tail/pf_loop_edges → loop_registration）在 `load_config` 里、import open3d 之前
+设置 `OMP_NUM_THREADS`；值超过 CPU 数时取 CPU 数（4 核云端 16 → 4）。脚本内的步骤切换（03 的回环）用 `omp_step()`
+运行时设置，实测**只能往下调**、且只对 odometry / 回环有效（下表 rt1、env1+rt8 两行）。调用方环境里显式的
+`OMP_NUM_THREADS` 优先于以上全部。
+
+**测量条件**：Xeon w5-2465X（16 物理核 / 32 线程，1 NUMA），Isaac Sim / rviz2 已关闭；每次测量前从 `/proc/stat`
+采样 1 s，其他进程占用 ≤ 2.7 核（gnome-shell、桌面远程、安全扫描、另一用户的进程）。每个设置一个全新进程，
+所有设置轮流跑 **3 遍**取中位数（任务要求“各计时一次”，但单次测量在这台共享机器上同一设置可差 2 倍以上——
+第一次单遍测量中 odometry 1 线程 28.1 s vs 11.1 s，本机日志 `outputs/logs/bench_threads_single_pass.log`，未提交）。
+工作量：odometry 第 1000 帧起 50 对（RGB-D odometry + 几何校验，同 03）；loop_registration = 10 对 v1 回环走 03 的
+`try_loop` + 3 对免位姿 FPFH+RANSAC+ICP（表中为两者之和）；tsdf = 200 帧 ScalableTSDF 积分 + 网格提取；
+mesh = 05 的清理 / 连通分量 / 减面（v1 原始网格 263 万面）。图像预先读入页缓存，计时不含磁盘。
+
+| 步骤（单进程） | 1 | 4 | 8 | 16 | 32 | 不设置（Open3D 默认） | **默认值** |
+|---|---|---|---|---|---|---|---|
+| odometry，50 对 [s] | **12.45** | 25.06 | 35.58 | 50.77 | 85.60 | 82.06 | **1** |
+| loop_registration，10+3 对 [s] | **15.18** | 25.28 | 27.36 | 31.84 | 53.01 | 53.82 | **1** |
+| tsdf，200 帧 [s] | 6.92 | 6.85 | 5.35 | **4.15** | 14.98 | 5.86 | **16** |
+| mesh，05 全流程 [s] | 28.40 | 29.24 | 28.41 | 27.62 | 27.34 | **26.01** | **null** |
+
+范围（3 次 min–max）：odometry 1 线程 11.17–15.55；tsdf 16 线程 4.02–9.90（双峰：多数 ~4 s，偶发 ~10 s，原因未查明），
+32 线程 14.35–16.00；mesh 各档 25.6–40 s，**档间差别在噪声内**，该步骤基本是串行的，默认取不设置。
+
+运行时切换检查（中位数 [s]）：
+
+| 步骤 | env 1 | rt1（env 不设，运行时 1） | env 8 | env1+rt8（env 1，运行时 8） | 结论 |
+|---|---|---|---|---|---|
+| odometry | 12.45 | 13.09 | 35.58 | 11.65 | 往下调有效，往上调无效 |
+| loop_registration | 15.18 | 21.09 | 27.36 | 18.08 | 往下调部分有效，往上调无效 |
+| tsdf | 6.92 | 4.17 | 5.35 | 7.58 | 无效（只认启动时的 env） |
+| mesh | 28.40 | 31.72 | 28.41 | 35.31 | 看不出差别 |
+
+**多进程（进程数 × 每进程线程数，总 32）**：当前流水线**没有多进程步骤**（v1/v2 的 03 都是单进程顺序执行），
+下表只作参考，说明如果把 odometry / 回环改成进程池能快多少（spawn 进程池，启动不计时；每个子进程用 `OMP_NUM_THREADS`）：
+
+| 进程 × 线程 | 1 × 32 | 2 × 16 | 4 × 8 | 8 × 4 | 16 × 2 | **32 × 1** |
+|---|---|---|---|---|---|---|
+| odometry，50 对 [s] | 84.18 | 10.94 | 5.25 | 3.24 | 2.28 | **1.48** |
+| loop（colored ICP），10 对 [s] | 49.18 | 7.99 | 4.86 | 3.56 | 2.30 | **1.82** |
+
+32 × 1 比最快的单进程（1 线程）快约 8 倍（odometry 12.45 → 1.48 s）。注意 50 对 / 32 进程每个进程只有 1–2 对，
+大规模时的收益要以全序列重测为准；odometry 顺序依赖（失败回退用前一步速度）也需要改写才能并行。
+
+**结论**：Open3D 的 odometry / 配准在这台机器上**线程越多越慢**（1 → 32 线程慢 6.9 倍），TSDF 在物理核数（16）
+最快、开到超线程（32）反而慢 3.6 倍，网格后处理与线程数无关。另一台机器的最优值不一定相同：云端 4 vCPU 曾测得
+odometry 4 线程 0.34 s/对 vs 1 线程 0.40 s/对（e7947e5），与这里相反——换机器先跑 `bench_threads.py` 再定值。

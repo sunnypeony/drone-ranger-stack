@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -13,6 +14,9 @@ import numpy as np
 import yaml
 
 EXP_DIR = Path(__file__).resolve().parent.parent
+# Captured at import, before anything in this process could set it: an explicit OMP_NUM_THREADS from
+# the caller's environment overrides every runtime.omp_threads step setting.
+_ENV_OMP = os.environ.get("OMP_NUM_THREADS")
 DEFAULT_CONFIG = EXP_DIR / "configs" / "default.yaml"
 
 
@@ -54,21 +58,53 @@ def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
         for k in parents:
             node = node.setdefault(k, {})
         node[leaf] = yaml.safe_load(val)
-    # Must happen before the first `import open3d` (all scripts import it lazily, after this).
-    # The right OpenMP thread count depends on the stage: Open3D's default pool (one thread per
-    # core) makes RGB-D odometry ~9x slower on a 32-core host (2.2 s vs 0.24 s per pair), while
-    # ScalableTSDF integration is ~140x slower with a single thread (2.4 s vs 1/60 s per frame).
-    # runtime.omp_threads_by_script[<script stem>] wins over runtime.omp_num_threads; null = library
-    # default; "auto" = min(CPU count, runtime.omp_auto_max) so the same config is multi-threaded on
-    # a small cloud VM without oversubscribing a large host; an explicit OMP_NUM_THREADS in the
-    # environment wins over all of these.
-    rt = cfg.get("runtime", {})
-    n = (rt.get("omp_threads_by_script") or {}).get(Path(sys.argv[0]).stem, rt.get("omp_num_threads"))
-    if n == "auto":
-        n = max(1, min(os.cpu_count() or 1, int(rt.get("omp_auto_max", 4))))
-    if n:
-        os.environ.setdefault("OMP_NUM_THREADS", str(n))
+    _startup_omp(cfg)
     return cfg
+
+
+# ----------------------------------------------------------------------------- OpenMP threads per step
+# runtime.omp_threads.<step> (odometry | loop_registration | tsdf | mesh): int = threads, capped at the
+# CPU count; null = Open3D's own default. Measured in README "OpenMP 线程数（按步骤）".
+# Some Open3D code (e.g. ScalableTSDF integration) only honours OMP_NUM_THREADS as it is at process
+# start and ignores later omp_set_num_threads, so each script's main step (SCRIPT_STEP) is applied as
+# OMP_NUM_THREADS in load_config, before open3d is imported. omp_step() additionally sets the count at
+# runtime around a step inside a multi-step script (03: odometry, loop registration); measured, this
+# only works for lowering the count, and only for odometry / loop registration (bench_threads.py
+# "rt1" / "env1+rt8" rows). An explicit OMP_NUM_THREADS in the caller's environment overrides all.
+SCRIPT_STEP = {"03_estimate_poses": "odometry", "03b_lidar_refine": "odometry", "04_integrate_tsdf": "tsdf",
+               "05_postprocess_mesh": "mesh", "eval_poses": "tsdf", "check_head_tail": "loop_registration",
+               "pf_loop_edges": "loop_registration"}
+
+
+def omp_threads_for(cfg: dict, step: str) -> int | None:
+    if _ENV_OMP:
+        return None
+    n = (cfg.get("runtime", {}).get("omp_threads") or {}).get(step)
+    return None if n is None else max(1, min(int(n), os.cpu_count() or 1))
+
+
+def _startup_omp(cfg: dict):
+    step = SCRIPT_STEP.get(Path(sys.argv[0]).stem)
+    n = omp_threads_for(cfg, step) if step else None
+    if n is None:
+        return
+    if "open3d" in sys.modules:
+        print(f"[warn] open3d already imported; OMP_NUM_THREADS={n} for step {step} may not take effect")
+    os.environ["OMP_NUM_THREADS"] = str(n)
+
+
+@contextlib.contextmanager
+def omp_step(cfg: dict, step: str):
+    """Runtime OpenMP thread count for the code inside the `with` block (threadpoolctl). Only code that
+    honours omp_set_num_threads is affected (see the note above)."""
+    n = omp_threads_for(cfg, step)
+    if n is None:
+        yield None
+        return
+    import open3d  # noqa: F401  (libgomp must be loaded for threadpoolctl to find it)
+    from threadpoolctl import threadpool_limits
+    with threadpool_limits(limits=n, user_api="openmp"):
+        yield n
 
 
 def exp_path(p: str | Path) -> Path:

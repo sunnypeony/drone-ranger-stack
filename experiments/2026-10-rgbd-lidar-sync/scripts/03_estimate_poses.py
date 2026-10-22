@@ -14,8 +14,8 @@ import numpy as np
 from tqdm import tqdm
 
 from common import (assert_rigid, coverage, die, find_bag_dir, get_typestore, interp_T, load_config,
-                    load_dynamic_tf, load_frames, load_static_tf, make_T, o3d_intrinsic, open_reader,
-                    parse_args, rot_angle_deg, rot_to_quat, stage_dir, write_json)
+                    load_dynamic_tf, load_frames, load_static_tf, make_T, o3d_intrinsic, omp_step,
+                    open_reader, parse_args, rot_angle_deg, rot_to_quat, stage_dir, write_json)
 
 
 # ----------------------------------------------------------------------------- IO helpers
@@ -106,6 +106,12 @@ def verify_step(fc, i, j, T, P, o3d):
 
 
 def run_odometry(fc, kf, P, ckpt_path, o3d):
+    """Runs _run_odometry with runtime.omp_threads.odometry."""
+    with omp_step(fc.cfg, "odometry"):
+        return _run_odometry(fc, kf, P, ckpt_path, o3d)
+
+
+def _run_odometry(fc, kf, P, ckpt_path, o3d):
     """Sequential odometry between consecutive keyframes with checkpointing.
     status: 0 RGB-D odometry ok, 2 colored-ICP fallback ok, 1 failed -> constant-velocity extrapolation.
     On resume, stored results are re-gated with the current thresholds and failures are recomputed."""
@@ -309,6 +315,11 @@ def colored_icp(fc, i, j, init, P, o3d):
 
 
 def try_loop(fc, i, j, est_T_j_i, P, o3d):
+    with omp_step(fc.cfg, "loop_registration"):
+        return _try_loop(fc, i, j, est_T_j_i, P, o3d)
+
+
+def _try_loop(fc, i, j, est_T_j_i, P, o3d):
     best = None
     for init in (est_T_j_i, np.eye(4)):
         ok, T_odo, info_odo = rgbd_odometry(fc, i, j, init, P, o3d)
