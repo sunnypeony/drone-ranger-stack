@@ -1,0 +1,7 @@
+data/
+outputs/
+.venv*/
+!results/
+!results/*.ply
+*.log
+!results/**/*.ply

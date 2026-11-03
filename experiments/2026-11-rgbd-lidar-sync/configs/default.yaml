@@ -1,0 +1,279 @@
+# Offline RGB-D (+2D LiDAR) -> TSDF mesh -> OBJ / USD pipeline.
+# All paths are relative to the experiment directory (the parent of configs/).
+
+paths:
+  data_dir: data
+  raw_dir: data/raw            # snapshot_download target (+ extracted archives)
+  bag_dir: /home/natasha/rosbags/rosbag2_2026_09_14-16_57_35_0   # local bag (not on Hugging Face); 00_download is skipped
+  outputs_dir: outputs
+  results_dir: results
+
+download:
+  repo_id: null                # this dataset is local only (paths.bag_dir); run_all.sh --from 1
+  repo_type: dataset           # retried as "model" if not found
+  revision: null
+  token_env: HF_TOKEN          # env var holding the token for private repos
+  extract_archives: true       # untar *.tar.gz / *.tgz / *.tar / *.zip after download
+  delete_archive_after_extract: false
+  min_free_disk_gb: 5.0        # stop if free disk drops below this
+
+topics:
+  rgb: /oak/rgb/image_raw
+  depth: /oak/depth/image_raw
+  camera_info: /oak/rgb/camera_info
+  scan: /scan
+  tf: /tf
+  tf_static: /tf_static
+  odom: /odom                  # optional, may be absent
+
+frames:
+  odom: odom
+  base: base_link
+  camera_optical: oak_rgb_camera_optical_frame
+  laser: laser_frame
+  tf_static_policy: first      # /tf_static published twice with different laser offsets; first message wins
+
+typestore: ROS2_HUMBLE
+
+# Frames after this many seconds from the first frame are ignored by pose estimation, TSDF and
+# evaluation (null = use all). The bag was cut by hand from a longer recording.
+cutoff_s: null
+
+runtime:
+  # OpenMP threads per pipeline step (Open3D). int = threads, capped at the CPU count; null = Open3D's
+  # own default. Each script's main step is applied as OMP_NUM_THREADS at start-up (common.SCRIPT_STEP);
+  # OMP_NUM_THREADS in the caller's environment overrides every step.
+  # Defaults = median-fastest in scripts/bench_threads.py on the lab host (Xeon w5-2465X, 16 cores /
+  # 32 threads, 3 repeats; README "OpenMP 线程数（按步骤）"). Re-measure on other hosts
+  # (bench_threads.py) and override with --set runtime.omp_threads.<step>=N.
+  omp_threads:
+    odometry: 1                 # RGB-D odometry (+ geometric check / ICP fallback), 03 / 03b: 0.25 s/pair; 32 thr 1.7 s
+    loop_registration: 1        # colored-ICP loops (03), FPFH+RANSAC+ICP (check_head_tail, pf_loop_edges)
+    tsdf: 16                    # ScalableTSDF integration (04, eval_poses): = physical cores; 32 threads is 3.6x slower
+    mesh: null                  # 05 clean-up / clusters / decimation: 26-29 s at any count (mostly serial)
+
+inspect:
+  sample_frame_index: 50       # which matched RGB-D pair to dump (clamped to available)
+  allowed_depth_encodings: [16UC1, mono16, 32FC1]
+  depth_stats_every: 10        # compute valid-pixel stats on every Nth depth image
+  odom_coverage_threshold: 0.9 # fraction of frames inside odom->base coverage to call it "available"
+  max_tf_gap_s: 0.5            # a gap longer than this in the odom->base stream breaks coverage
+  sample_pointcloud_stride: 2  # pixel stride when building frame0.ply
+
+extract:
+  match_tolerance_ns: 0        # 0 = exact header.stamp match; >0 = nearest-neighbour fallback
+  frame_stride: 2
+  depth_min: 0.3               # m
+  depth_max: 8.0               # m; extract up to 8 m (only 53% of valid depth is <= 5 m here), TSDF uses tsdf.depth_trunc
+  depth_32fc1_scale: 1.0       # 32FC1 depth is in metres (REP 117)
+  depth_16uc1_scale: 0.001     # 16UC1 depth is in millimetres
+  denoise: none                # none | median | bilateral
+  median_ksize: 5
+  bilateral_d: 5
+  bilateral_sigma_color_mm: 30.0
+  bilateral_sigma_space: 5.0
+  undistort: auto              # auto | true | false
+  undistort_alpha: 0.0         # getOptimalNewCameraMatrix alpha (0 = crop to valid pixels)
+  zero_d_eps: 1.0e-9
+
+poses:
+  pose_source: auto            # auto | bag_tf | open3d
+  compare_both: true           # if bag odom exists AND open3d is runnable, compute both and compare
+  tf_interp_max_gap_s: 0.5     # do not interpolate across TF gaps larger than this
+  # --- open3d odometry ---
+  keyframe_stride: 1           # use every Nth extracted frame as a keyframe
+  odometry_depth_max: 4.0      # m, depth cutoff used for odometry
+  odometry_depth_diff_max: 0.07
+  odometry_min_depth: 0.3
+  odometry_iterations: [20, 10, 5]   # coarse -> fine pyramid levels
+  odometry_min_valid_ratio: 0.05     # skip/flag pairs whose depth is mostly empty
+  odometry_max_translation: 0.08     # m per keyframe step (~1.2 m/s at 15 Hz); larger = treat as failure
+  odometry_max_rotation_deg: 8.0     # per keyframe step; larger = treat as failure
+  odometry_fallback_window: 5        # failed step = median of the last N good steps
+  odometry_verify: true              # geometric check (cloud fitness) of every odometry step
+  odometry_verify_fitness_min: 0.5   # at icp_voxel * icp_eval_dist_scale
+  odometry_icp_fallback: true        # colored ICP when RGB-D odometry fails (robust to motion blur)
+  odometry_info_min: 1000.0          # min info[5,5] (point count proxy); smaller = failure
+  odometry_fail_info_scale: 1.0      # information (x I6) of an extrapolated (failed) odometry edge
+  # --- ground-plane constraint (assumes a roughly flat ground, true for this yard) ---
+  ground_constraint: true      # correct roll/pitch + height from the per-frame ground plane
+  ground_refine_after_pgo: true
+  ground_roi_top_frac: 0.5     # only use the lower part of the image
+  ground_pixel_stride: 2
+  ground_max_depth: 4.0        # m
+  ground_ransac_dist: 0.03     # m
+  ground_ransac_iters: 300
+  ground_min_points: 2000
+  ground_min_inlier_frac: 0.3
+  ground_max_angle_deg: 40.0   # vs camera up at t0
+  ground_min_valid_frames: 20
+  ground_smooth_window: 31     # keyframes, windowed median of corrections / heights
+  ground_fix_height: true
+  ground_outlier_window: 151   # keyframes, long median used to reject bad plane fits
+  ground_outlier_max_deg: 4.0
+  ground_outlier_max_height: 0.12  # m
+  # --- loop closure ---
+  loop_min_gap_s: 20.0
+  loop_max_dist: 1.0           # m, candidate gate on current pose estimate
+  loop_max_angle_deg: 45.0
+  loop_candidate_stride: 5     # only test every Nth keyframe as loop target
+  loop_max_candidates_per_frame: 3
+  loop_query_stride: 10        # only query every Nth keyframe (10 = every 0.67 s; 4x longer bag than the 2026-10 one)
+  loop_force_head_tail: 0      # force first N vs last N keyframes; 0 = off: this walk is not known to end where it started
+  loop_force_stride: 3
+  icp_voxel: 0.04              # m, voxel for colored ICP
+  icp_max_iter: [50, 30, 14]
+  icp_radius_scales: [4.0, 2.0, 1.0]  # x icp_voxel per level
+  icp_min_points: 500
+  icp_normal_radius_scale: 2.0
+  icp_normal_max_nn: 30
+  icp_rel_eps: 1.0e-6
+  icp_eval_dist_scale: 1.5     # x icp_voxel, correspondence distance for fitness/RMSE/information
+  loop_fitness_min: 0.3
+  loop_rmse_max: 0.03          # m
+  loop_odometry_info_min: 3000.0
+  # --- pose graph ---
+  pg_max_correspondence_distance: 0.05
+  pg_edge_prune_threshold: 0.25
+  pg_preference_loop_closure: 1.0
+  pg_reference_node: 0
+  # --- checkpoint ---
+  checkpoint_every: 50         # write odometry checkpoint every N keyframe pairs
+  # --- outputs ---
+  preview_every: 10
+  preview_voxel: 0.03
+  preview_depth_max: 4.0
+  preview_ground_percentile: 5
+  preview_slice_above_ground: [0.4, 1.2]   # m, height band for the ghosting slice
+  head_tail_warn_m: 0.3
+  rigid_det_tol: 1.0e-3
+  rigid_orth_tol: 1.0e-3
+
+head_tail_check:               # scripts/check_head_tail.py: pose-free start/end adjudication
+  head_frames: [0, 150]        # extracted-frame index range [start, end) for the head segment
+  tail_frames: 150             # last N extracted frames form the tail segment
+  n_samples: 5                 # frames sampled evenly from each segment (25 head x tail pairs)
+  depth_max: 4.0               # m
+  voxel: 0.05                  # m, FPFH / RANSAC resolution
+  normal_radius_scale: 2.0     # x voxel
+  fpfh_radius_scale: 5.0       # x voxel
+  fpfh_max_nn: 100
+  ransac_dist_scale: 1.5       # x voxel
+  ransac_edge_length: 0.9
+  ransac_max_iter: 200000
+  ransac_confidence: 0.999
+  ransac_seed: 0
+  icp_voxels: [0.05, 0.025]    # m, point-to-plane refinement pyramid
+  icp_max_iter: [60, 40]
+  icp_corr_scale: 1.5          # x voxel
+  fitness_min: 0.3             # ICP fitness below this = registration not trusted
+  # The yard ground fits any yaw about its normal, so with ground points fitness cannot tell a
+  # 180-deg flip from a correct result. Remove the dominant plane before registering.
+  remove_ground: true
+  ground_dist: 0.05            # m, RANSAC plane inlier distance
+  ground_ransac_iters: 1000
+  ground_min_frac: 0.15        # only remove the plane if it holds at least this point fraction
+  agree_trans_m: 0.15          # results within this of the median count as "agreeing"
+  agree_rot_deg: 5.0
+  out_dir: head_tail           # under outputs/
+  sweep_frames: 400            # also register every sweep_stride-th of the last N frames to the first
+  sweep_stride: 10
+  max_plausible_rot_deg: 45.0  # sweep results rotated more than this do not share the start view
+  reference_head_tail_m:       # head-tail distances reported by earlier runs, for comparison
+    cloud_v1: 1.43
+    local_v1_direct: 0.064
+
+tsdf:
+  voxel_length: 0.02
+  sdf_trunc: 0.08
+  depth_scale: 1000.0
+  depth_trunc: 5.0             # m; null = extract.depth_max. Raise (e.g. 7 + voxel 0.03 / sdf_trunc 0.12) if far walls are missing
+  frame_stride: 1              # integrate every Nth posed frame
+  checkpoint_every: 200        # frames; partial mesh/pointcloud checkpoint (resume = re-integrate up to done frames)
+
+mesh:
+  min_cluster_ratio: 0.001     # keep largest cluster + clusters with area > ratio * total area.
+                               # (task default was 0.02; on this data that deletes the table: 0.34% of area)
+  target_triangles: 200000
+  level_ground: true
+  ground_distance_threshold: 0.03
+  ground_ransac_n: 3
+  ground_num_iterations: 2000
+  ground_max_planes: 5         # iterate RANSAC up to N planes, pick the best ground
+  ground_max_angle_deg: 35.0   # plane normal vs current up direction
+  ground_min_inliers: 2000
+  ground_sample_points: 300000 # sample points from mesh for RANSAC
+  up_axis_hint: auto           # auto | +z | -y  (auto: +z if world is base_link-like, -y if world = first optical frame)
+  max_result_file_mb: 90       # results/ file limit; halve target_triangles until satisfied
+
+usd:
+  filename: scene_collision.usdc
+  write_usda: false
+  convex_decomp: true
+  convex_decomp_filename: scene_collision_convexdecomp.usdc
+  meters_per_unit: 1.0
+  up_axis: Z
+
+lidar:
+  enabled: true
+  scan_stride: 5               # use every Nth scan
+  range_min: 0.6              # m; shorter returns are mostly the operator holding the rig
+  range_max: 12.0
+  compare_range_max: 4.0       # m; distance metric only where the RGB-D mesh can exist
+  slice_half_thickness: 0.05   # m, mesh slice around the laser plane height
+  time_offset_s: 0.0           # s, added to scan stamp before trajectory lookup
+  T_base_laser: null           # [x, y, z, yaw_deg] fixed measured extrinsic; null = use /tf_static
+  plot_extent_margin: 1.0
+  max_points_plot: 200000
+
+eval:                          # scripts/eval_poses.py: same metrics for every pose set
+  pose_sets:                   # name -> poses.npz (T_world_optical, frame_idx, stamp_ns)
+    v1: outputs/poses/poses.npz
+  out_dir: eval
+  cloud_every: 10              # accumulated cloud: every Nth posed frame
+  cloud_voxel: 0.03
+  depth_max: 4.0
+  ground_dist: 0.05            # m, RANSAC inlier distance = the "+-5 cm ground band"
+  ground_ransac_iters: 2000
+  ground_max_tilt_deg: 30.0    # ground plane normal must be within this of world +Z
+  ground_max_tries: 5          # planes peeled off while looking for the ground
+  slice: [0.4, 1.2]            # m above ground, ghosting slice
+  slice_grid: 0.05             # m, occupancy cell size
+  mesh_voxel: 0.03             # coarse TSDF just for the scan-to-mesh metric
+  mesh_sdf_trunc: 0.12
+  mesh_frame_stride: 2
+  scan_stride: 5
+  scan_range_max: 4.0          # m, only score returns where the RGB-D mesh can exist
+  # The LiDAR sees 360 deg but the camera only ever looks forward (~60 deg HFOV): returns to
+  # the sides/back mostly have no mesh near them whatever the poses, which swamps the metric.
+  scan_camera_fov_only: true
+  scan_fov_margin_deg: 0.0     # shrink (+) / grow (-) the camera HFOV for the scan filter
+  # Pose-free references from check_head_tail.py: relative pose first-frame -> tail frame, used
+  # only for tail frames whose 5 repeated (static-head) registrations agree within ref_max_spread_m.
+  # This is the only metric here that sees global drift; the others are local / self-consistent.
+  head_tail_reference: outputs/head_tail/head_tail.json
+  ref_max_spread_m: 0.08
+  ref_max_rot_range_deg: 3.0
+
+table_check:                   # scripts/table_check.py: ray-cast coverage of the table top
+  coverage_radius_frac: 0.7    # disk of this fraction of the detected table radius
+  grid: 0.02                   # m between rays
+  map_half_width: 1.0          # m, height-map window for the figure
+
+bench:                         # scripts/bench_threads.py: OpenMP threads per step (and process x thread)
+  threads: [1, 4, 8, 16, 32]
+  repeats: 3                   # every setting, round-robin; median + range reported
+  max_busy_cores: 2.0          # refuse to start if other work keeps more cores than this busy
+  odometry_start: 1000         # extracted-frame index of the first pair
+  odometry_pairs: 50
+  loop_cache: outputs/poses/ckpt_loops.json   # v1 loop cache: real loop pairs + their transforms
+  loop_pairs: 10
+  loop_pick_stride: 37         # spread the picked pairs over the cache
+  fpfh_head: 0                 # pose-free registration pairs (check_head_tail.Registrar)
+  fpfh_tails: [2545, 2551, 2557]
+  tsdf_start: 1000             # posed-frame index of the first integrated frame
+  tsdf_frames: 200
+  mesh_raw: outputs/tsdf/mesh_raw.ply
+  mechanism_check_threads: [1, 8]    # runtime-switch check per step: rt 1 vs env 1, env 1 + rt 8 vs env 8
+  pool_steps: [odometry_pool, loop_pool]
+  pool_combos: [[1, 32], [2, 16], [4, 8], [8, 4], [16, 2], [32, 1]]   # [processes, threads per process]
