@@ -25,9 +25,9 @@ def input_hash(cfg, poses_path):
 
 
 def main():
-    import open3d as o3d
     args = parse_args(__doc__, lambda p: p.add_argument("--force", action="store_true", help="ignore done.json"))
     cfg = load_config(args.config, args.set)
+    import open3d as o3d
     C = cfg["tsdf"]
     out = stage_dir(cfg, "tsdf")
     fdir, rows, intr = load_frames(cfg)
