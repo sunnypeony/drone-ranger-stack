@@ -238,6 +238,15 @@ render_views:                  # scripts/render_views.py: mesh ray-cast from rea
   n_auto: 6
   columns: 3
   scale: 0.6
+  birdseye:                    # views from outside the scene (no camera was there); null = off
+    views: [[0, 50], [90, 50], [180, 50], [270, 50], [0, 89], [135, 20]]   # [azimuth, elevation] deg
+    distance_m: 22.0           # from the middle of the camera path
+    target_height_m: 0.5
+    width: 900
+    height: 600
+    focal_px: 600
+    columns: 3
+    scale: 0.8
 
 lidar_tilt_fit:                # scripts/fit_lidar_tilt.py: pose-free LiDAR pitch / roll vs camera depth
   frame_every: 15              # extracted frames between pairs
