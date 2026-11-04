@@ -1,0 +1,42 @@
+{
+  "scans_total": 6958,
+  "scans_used": 1392,
+  "points": 215582,
+  "points_compared": 108771,
+  "compare_range_m": [
+    0.6,
+    4.0
+  ],
+  "laser_height_median_m": 0.9198871880523067,
+  "laser_height_std_m": 0.3436192211756662,
+  "dist_to_mesh_median_m": 0.8703753352165222,
+  "dist_to_mesh_p90_m": 1.5600882768630981,
+  "mesh_slice_points": 8048,
+  "time_offset_s": 0.0,
+  "T_base_laser": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.125
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.025
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ]
+}

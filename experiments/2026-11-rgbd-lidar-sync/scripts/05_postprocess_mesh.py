@@ -65,9 +65,9 @@ def find_ground(mesh, up, M, o3d):
 
 
 def main():
-    import open3d as o3d
     args = parse_args(__doc__)
     cfg = load_config(args.config, args.set)
+    import open3d as o3d
     M = cfg["mesh"]
     out = stage_dir(cfg, "mesh")
     mesh = o3d.io.read_triangle_mesh(str(stage_dir(cfg, "tsdf") / "mesh_raw.ply"))

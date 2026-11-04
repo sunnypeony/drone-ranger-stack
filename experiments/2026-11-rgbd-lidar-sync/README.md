@@ -39,5 +39,35 @@ uv venv -p 3.12 .venv && VIRTUAL_ENV=$PWD/.venv uv pip install -r requirements.t
 ```
 本次 01 单独先跑（`outputs/inspect/report.json`），之后 `./run_all.sh --from 2 --with-lidar`。
 
-## 结果
-（运行中）
+## 代码修改（相对 2026-10）
+- **04 / 05 的 `import open3d` 移到 `load_config` 之后**。原来先 import 再读配置，`runtime.omp_threads.tsdf: 16`
+  在正式运行中从未生效（日志里有 `[warn] open3d already imported`，进程实际跑满约 29 线程）：
+  本数据 TSDF 积分 1.6 s/帧（预计 4.7 h）→ 修复后约 22 帧/s，10423 帧 586 s。
+  `bench_threads.py` 的测量不受影响（它在子进程启动前设环境变量），但 2026-10 分支上的 04 有同样的问题。
+
+## 结果：**位姿漂移严重，网格只能看个大概，不能当可用场景**
+`results/`：`scene_collision.usdc`（静态碰撞，`verify_usd` 通过）、`mesh_clean.obj/.ply`（20 万三角形）、
+`mesh_views.png`、`trajectory_topdown.png`、`accumulated_preview.png`、`lidar_vs_mesh.png`、
+`odometry_failure_frames.jpg`，以及 `pose_report / mesh_report / lidar_report / usd_report / report(01 检查).json`。
+
+| 指标 | 本数据 | 2026-10 v1 |
+|---|---|---|
+| odometry 失败 | **843 / 10422（8%）**，ICP 兜底 426 | 4 |
+| 回环 | 候选 962 → 接受 66 → 剪枝后 57 | — |
+| 首尾距离 / 路径长 | 5.81 m / 215 m（不知是否回到起点，不作误差） | — |
+| 倾斜残差（最终） | 中位 0.6°，p90 3.3°，最大 41° | — |
+| LiDAR 到网格距离（0.6–4 m） | **中位 0.87 m，p90 1.56 m** | — |
+| 网格 | 原始 1014 万三角形 → 64.8 万个连通块只留 62 个 → 抽稀到 20 万 | — |
+
+现象：
+- 三条轨迹（只 odometry / +地面 / PGO 后）彼此差几米，`accumulated_preview` 的侧视图里地面不是一条细线；
+  `lidar_vs_mesh` 里同一面墙被扫成多条错开的扇形 → 位姿全局不一致，网格碎成块、有重影，看不到连续地面。
+- 失败集中在序列 30–50%（约 195–350 s；最长连续 121 对 = 8 s，从第 4001 对开始），其余在 20–30%、90–100%。
+- **原因是逆光**（`odometry_failure_frames.jpg`）：失败段相机正对太阳、经常仰拍天空，深度变成横竖条纹，
+  有效像素只有 27–37%；再叠加上面说的 x≈280–380 px 固定弱区。这是数据问题，调参救不回来。
+
+建议：
+1. **重新采集**：背光或阴天，相机别仰拍天空，先清理/检查双目镜头（弱区）。这是最有效的一步。
+2. 若只能用这份数据：可以截取 odometry 正常的片段单独重建（如前 20% ≈ 140 s，失败 15 次）；
+   改 `tsdf.depth_trunc` 救不了位姿。
+3. 本数据仍没有 `/odom`；若无人机有 VIO/飞控里程计，录进 bag 后流水线会直接使用（`odom_coverage`）。

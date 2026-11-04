@@ -1,0 +1,275 @@
+{
+  "bag_dir": "/home/natasha/rosbags/rosbag2_2026_09_14-16_57_35_0",
+  "bag_size_bytes": 26790681983,
+  "bag_size": "25.0GB",
+  "storage": [
+    "rosbag2_2026_09_14-16_57_35_0.db3"
+  ],
+  "bag_duration_s": 696.025357574,
+  "topics": {
+    "/tf_static": {
+      "type": "tf2_msgs/msg/TFMessage",
+      "count": 2,
+      "first_ns": 1789430255864346569,
+      "last_ns": 1789430257109657441,
+      "duration_s": 1.245310872,
+      "rate_hz": 0.8030123421262478
+    },
+    "/oak/rgb/image_raw": {
+      "type": "sensor_msgs/msg/Image",
+      "count": 20846,
+      "first_ns": 1789430255880706292,
+      "last_ns": 1789430951889704142,
+      "duration_s": 696.00899785,
+      "rate_hz": 29.949325460433773
+    },
+    "/scan": {
+      "type": "sensor_msgs/msg/LaserScan",
+      "count": 6958,
+      "first_ns": 1789430257163815745,
+      "last_ns": 1789430951833750511,
+      "duration_s": 694.669934766,
+      "rate_hz": 10.014828124587643
+    },
+    "/oak/rgb/camera_info": {
+      "type": "sensor_msgs/msg/CameraInfo",
+      "count": 20848,
+      "first_ns": 1789430255871433611,
+      "last_ns": 1789430951879653516,
+      "duration_s": 696.008219905,
+      "rate_hz": 29.95223246479109
+    },
+    "/oak/depth/image_raw": {
+      "type": "sensor_msgs/msg/Image",
+      "count": 20848,
+      "first_ns": 1789430255871391434,
+      "last_ns": 1789430951879326371,
+      "duration_s": 696.007934937,
+      "rate_hz": 29.952244728196945
+    },
+    "/oak/depth/camera_info": {
+      "type": "sensor_msgs/msg/CameraInfo",
+      "count": 20848,
+      "first_ns": 1789430255870562832,
+      "last_ns": 1789430951879639275,
+      "duration_s": 696.009076443,
+      "rate_hz": 29.952195604315907
+    }
+  },
+  "images": {
+    "rgb": {
+      "encoding": "bgr8",
+      "width": 640,
+      "height": 400,
+      "step": 1920,
+      "is_bigendian": 0,
+      "frame_id": "oak_rgb_camera_optical_frame"
+    },
+    "depth": {
+      "encoding": "16UC1",
+      "width": 640,
+      "height": 400,
+      "step": 1280,
+      "is_bigendian": 0,
+      "frame_id": "oak_rgb_camera_optical_frame"
+    }
+  },
+  "camera_info": {
+    "width": 640,
+    "height": 400,
+    "K": [
+      [
+        553.7770385742188,
+        0.0,
+        329.0152587890625
+      ],
+      [
+        0.0,
+        553.8973999023438,
+        189.52587890625
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "D": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "distortion_model": "plumb_bob",
+    "frame_id": "oak_rgb_camera_optical_frame",
+    "D_all_zero": true
+  },
+  "stamp_match": {
+    "rgb_count": 20846,
+    "depth_count": 20848,
+    "camera_info_count": 20848,
+    "rgb_unique": 20846,
+    "depth_unique": 20848,
+    "rgb_depth_exact": 20846,
+    "rgb_depth_exact_ratio_of_rgb": 1.0,
+    "rgb_depth_exact_ratio_of_depth": 0.9999040675364543,
+    "rgb_caminfo_exact_ratio_of_rgb": 1.0,
+    "triple_exact": 20846,
+    "bag_minus_header_ms_depth_median": 4.701038
+  },
+  "tf_static": {
+    "frames": [
+      "base_link",
+      "laser_frame",
+      "oak_rgb_camera_frame",
+      "oak_rgb_camera_optical_frame"
+    ],
+    "edges": {
+      "oak_rgb_camera_frame": "base_link",
+      "oak_rgb_camera_optical_frame": "oak_rgb_camera_frame",
+      "laser_frame": "base_link"
+    },
+    "base_to_optical_exists": true,
+    "base_to_laser_exists": true,
+    "T_base_optical": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.125
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_base_laser": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.125
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.025
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "policy": "first",
+    "conflicts": [
+      {
+        "child": "laser_frame",
+        "kept_parent": "base_link",
+        "kept_T": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.125
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.025
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "other_parent": "base_link",
+        "other_T": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.02
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "policy": "first"
+      }
+    ]
+  },
+  "tf_dynamic_pairs": {},
+  "odometry": {
+    "odom_topic_present": false,
+    "odom_to_base_source": null,
+    "samples": 0,
+    "coverage_of_rgbd_pairs": 0.0,
+    "available": false,
+    "span_s": 0.0
+  },
+  "depth_stats": {
+    "sampled": 2085,
+    "valid_ratio_mean": 0.5971680193345323,
+    "valid_ratio_min": 0.2021328125,
+    "valid_ratio_max": 0.77174609375,
+    "in_range_ratio_mean": 0.3189273231414868,
+    "median_depth_m_mean": 4.8723325874879775,
+    "range_used": [
+      0.3,
+      5.0
+    ]
+  },
+  "sample_frame": {
+    "pair_index": 50,
+    "stamp_ns": 1789430257532550522
+  },
+  "errors": []
+}

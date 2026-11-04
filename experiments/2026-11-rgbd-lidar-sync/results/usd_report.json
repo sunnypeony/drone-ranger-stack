@@ -1,0 +1,10 @@
+{
+  "main": "/home/natasha/drone-ranger-stack/experiments/2026-11-rgbd-lidar-sync/outputs/usd/scene_collision.usdc",
+  "convex_decomp": "/home/natasha/drone-ranger-stack/experiments/2026-11-rgbd-lidar-sync/outputs/usd/scene_collision_convexdecomp.usdc",
+  "triangles": 200000,
+  "vertices": 72427,
+  "sizes_mb": {
+    "main": 3.498366,
+    "convex_decomp": 3.498391
+  }
+}
