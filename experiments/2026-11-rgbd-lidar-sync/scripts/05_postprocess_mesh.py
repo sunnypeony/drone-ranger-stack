@@ -16,7 +16,9 @@ def clean(mesh):
     return mesh
 
 
-def keep_clusters(mesh, ratio):
+def keep_clusters(mesh, ratio, min_area=None):
+    """Keep the largest cluster, clusters with area >= ratio * total and (if set) area >= min_area m^2.
+    A relative threshold alone drops small near objects once distant geometry dominates the total."""
     tri_cluster, n_tri, areas = mesh.cluster_connected_triangles()
     tri_cluster = np.asarray(tri_cluster)
     areas = np.asarray(areas)
@@ -24,6 +26,8 @@ def keep_clusters(mesh, ratio):
         die("mesh has no triangles")
     total = areas.sum()
     keep = (areas >= ratio * total)
+    if min_area is not None:
+        keep |= areas >= min_area
     keep[np.argmax(areas)] = True
     mesh.remove_triangles_by_mask(~keep[tri_cluster])
     mesh.remove_unreferenced_vertices()
@@ -74,7 +78,7 @@ def main():
     rep = {"raw_triangles": len(mesh.triangles), "raw_vertices": len(mesh.vertices)}
     clean(mesh)
     rep["after_clean_triangles"] = len(mesh.triangles)
-    rep.update(keep_clusters(mesh, M["min_cluster_ratio"]))
+    rep.update(keep_clusters(mesh, M["min_cluster_ratio"], M.get("min_cluster_area_m2")))
     rep["after_cluster_triangles"] = len(mesh.triangles)
     clustered = mesh
 

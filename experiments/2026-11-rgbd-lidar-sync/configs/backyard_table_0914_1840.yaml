@@ -1,0 +1,42 @@
+# Backyard, walk around a table, 2026-09-14 18:40, 3 min, hand-trimmed from a longer recording
+# (= the 2026-10 experiment's data, HF danyangh/static_table_rgbd_2dlaserscan_rosbag_3min). In shade.
+# Goal here vs 2026-10 v1: also reconstruct the fence, trees and house wall, which are 6-11 m from the
+# camera (only 46% of valid depth is <= 5 m; 81% <= 10 m). Results: README "数据集 backyard_table_0914_1840".
+base: default.yaml
+dataset: backyard_table_0914_1840
+
+paths:
+  bag_dir: /home/natasha/rosbags/rosbag2_trimmed   # set to null to download instead (00_download)
+
+download:
+  repo_id: danyangh/static_table_rgbd_2dlaserscan_rosbag_3min
+
+cutoff_s: 175.0                # the bag's last frame is arbitrary (hand-trimmed); 02 drops frames after this
+
+extract:
+  depth_max: 11.0              # keep the house wall (~9.5 m from the table) and the fence
+
+tsdf:
+  depth_trunc: 4.5             # near band: table, chairs, plants at 2 cm voxels (same as 2026-10 v1 within 4.5 m)
+  far:                         # stereo noise ~5 cm at 5 m, ~20-24 cm at 9.5 m (plane fit on the house wall)
+    depth_min: 4.0             # 0.5 m overlap with the near band
+    depth_trunc: 10.5
+    voxel_length: 0.05
+    sdf_trunc: 0.25            # ~1 sigma of single-frame noise at 9.5 m; TSDF averages hundreds of views
+    near_overlap_m: 0.10       # far triangles closer than this to the near mesh are dropped
+
+mesh:
+  # total area is 2180 m^2 (v1: 307), so min_cluster_ratio 0.001 alone (= 2.2 m^2) dropped the table
+  # (one cluster, 1.38 m^2); 0.3 m^2 = what the ratio meant on the v1 mesh
+  min_cluster_area_m2: 0.3
+  target_triangles: 1000000    # 7x the area of v1 (200k); 05 halves it if a results/ file would exceed 90 MB
+
+lidar:
+  compare_range_max: 10.0      # the mesh now reaches the fence / wall, so score LiDAR returns out to 10 m
+  # /tf_static translation + pitch / roll fitted pose-free by fit_lidar_tilt.py: the laser points 6 deg
+  # down vs the camera (at 0.8 m it hits the lawn ~7.6 m out). With it depth / LiDAR = 1.08 / 1.01 / 0.96
+  # at 4-6 / 6-8 / 8-12 m, without it 1.24 / 1.26 / 1.19; fx x1.0 fits best (2026-10's "fx ~482" is refuted).
+  T_base_laser: [0.125, 0.0, 0.025, 0.0, 6.0, 0.25]
+
+render_views:
+  frames: [0, 385, 771, 1157, 1928, 2314]   # fence + tree, fence, house, fence + path, gazebo + chairs, house + AC

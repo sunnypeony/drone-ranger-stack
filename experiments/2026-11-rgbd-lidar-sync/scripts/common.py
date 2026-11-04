@@ -5,6 +5,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -44,13 +45,49 @@ def _deep_merge(base: dict, over: dict) -> dict:
     return out
 
 
-def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
-    """Load YAML; a top-level `base: other.yaml` key inherits (deep-merges) another config file."""
-    path = Path(path)
+def _load_yaml_tree(path: Path) -> dict:
     with open(path) as f:
         cfg = yaml.safe_load(f)
     if cfg.get("base"):
-        cfg = _deep_merge(load_config(path.parent / cfg.pop("base")), cfg)
+        cfg = _deep_merge(_load_yaml_tree(path.parent / cfg.pop("base")), cfg)
+    return cfg
+
+
+_REF = re.compile(r"\$\{([A-Za-z0-9_.]+)\}")
+
+
+def _lookup(cfg: dict, key: str):
+    node = cfg
+    for k in key.split("."):
+        if not isinstance(node, dict) or k not in node:
+            die(f"config: ${{{key}}} is not defined")
+        node = node[k]
+    if node is None:
+        die(f"config: ${{{key}}} is null (run a dataset config, e.g. ./run_all.sh --dataset NAME)")
+    return node
+
+
+def _interpolate(cfg: dict, node=None):
+    """Replace `${a.b}` in string values with the (final, merged) value of key a.b, e.g.
+    `outputs_dir: outputs/${dataset}`. References may chain; cycles are not detected (8 passes)."""
+    node = cfg if node is None else node
+    items = node.items() if isinstance(node, dict) else enumerate(node)
+    for k, v in list(items):
+        if isinstance(v, (dict, list)):
+            _interpolate(cfg, v)
+        elif isinstance(v, str) and "${" in v:
+            for _ in range(8):
+                m = _REF.fullmatch(v)
+                v = _lookup(cfg, m.group(1)) if m else _REF.sub(lambda mm: str(_lookup(cfg, mm.group(1))), v)
+                if not (isinstance(v, str) and "${" in v):
+                    break
+            node[k] = v
+
+
+def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
+    """Load YAML; a top-level `base: other.yaml` key inherits (deep-merges) another config file.
+    `--set` overrides are applied after merging, then `${key}` references are resolved."""
+    cfg = _load_yaml_tree(Path(path))
     for item in overrides or []:
         key, _, val = item.partition("=")
         node = cfg
@@ -58,6 +95,7 @@ def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
         for k in parents:
             node = node.setdefault(k, {})
         node[leaf] = yaml.safe_load(val)
+    _interpolate(cfg)
     _startup_omp(cfg)
     return cfg
 
@@ -437,14 +475,23 @@ class StaticTF:
         return sorted(s)
 
 
+def rpy_to_R(roll_deg: float, pitch_deg: float, yaw_deg: float) -> np.ndarray:
+    """R = Rz(yaw) Ry(pitch) Rx(roll), degrees."""
+    r, p, y = np.radians([roll_deg, pitch_deg, yaw_deg])
+    Rx = np.array([[1, 0, 0], [0, np.cos(r), -np.sin(r)], [0, np.sin(r), np.cos(r)]])
+    Ry = np.array([[np.cos(p), 0, np.sin(p)], [0, 1, 0], [-np.sin(p), 0, np.cos(p)]])
+    Rz = np.array([[np.cos(y), -np.sin(y), 0], [np.sin(y), np.cos(y), 0], [0, 0, 1]])
+    return Rz @ Ry @ Rx
+
+
 def T_base_laser_from_cfg(cfg: dict, static_tf: "StaticTF | None" = None) -> np.ndarray:
-    """Fixed, measured laser extrinsic from config (`lidar.T_base_laser`: [x, y, z, yaw_deg]) if set,
-    otherwise base->laser from /tf_static."""
+    """Fixed, measured laser extrinsic from config (`lidar.T_base_laser`: [x, y, z, yaw_deg] or
+    [x, y, z, yaw_deg, pitch_deg, roll_deg], R = Rz(yaw) Ry(pitch) Rx(roll); pitch > 0 = beam tilted
+    down, see fit_lidar_tilt.py) if set, otherwise base->laser from /tf_static."""
     fixed = cfg.get("lidar", {}).get("T_base_laser")
     if fixed is not None:
-        x, y, z, yaw = fixed
-        c, s = np.cos(np.radians(yaw)), np.sin(np.radians(yaw))
-        return make_T(np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]]), [x, y, z])
+        x, y, z, yaw, pitch, roll = (list(fixed) + [0.0, 0.0])[:6]
+        return make_T(rpy_to_R(roll, pitch, yaw), [x, y, z])
     if static_tf is None:
         die("no fixed lidar.T_base_laser in config and no /tf_static given")
     T = static_tf.lookup(cfg["frames"]["base"], cfg["frames"]["laser"])

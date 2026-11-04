@@ -1,15 +1,19 @@
-# Offline RGB-D (+2D LiDAR) -> TSDF mesh -> OBJ / USD pipeline.
-# All paths are relative to the experiment directory (the parent of configs/).
+# Offline RGB-D (+2D LiDAR) -> TSDF mesh -> OBJ / USD pipeline: settings shared by every dataset.
+# Not run directly: each dataset is a configs/<name>.yaml with `base: default.yaml` that sets `dataset`,
+# the bag and whatever differs (./run_all.sh --dataset <name>).
+# All paths are relative to the experiment directory (the parent of configs/). `${key}` = value of key.
+
+dataset: null                  # set by the dataset config; names outputs/<dataset>/ and results/<dataset>/
 
 paths:
   data_dir: data
-  raw_dir: data/raw            # snapshot_download target (+ extracted archives)
-  bag_dir: /home/natasha/rosbags/rosbag2_2026_09_14-16_57_35_0   # local bag (not on Hugging Face); 00_download is skipped
-  outputs_dir: outputs
-  results_dir: results
+  raw_dir: data/${dataset}/raw # snapshot_download target (+ extracted archives)
+  bag_dir: null                # local bag directory (metadata.yaml); null = find it under raw_dir (00_download)
+  outputs_dir: outputs/${dataset}
+  results_dir: results/${dataset}
 
 download:
-  repo_id: null                # this dataset is local only (paths.bag_dir); run_all.sh --from 1
+  repo_id: null                # Hugging Face dataset with the bag (used by 00_download when bag_dir is null)
   repo_type: dataset           # retried as "model" if not found
   revision: null
   token_env: HF_TOKEN          # env var holding the token for private repos
@@ -64,7 +68,7 @@ extract:
   match_tolerance_ns: 0        # 0 = exact header.stamp match; >0 = nearest-neighbour fallback
   frame_stride: 2
   depth_min: 0.3               # m
-  depth_max: 8.0               # m; extract up to 8 m (only 53% of valid depth is <= 5 m here), TSDF uses tsdf.depth_trunc
+  depth_max: 8.0               # m; frames on disk keep depth up to here; TSDF / odometry use their own cutoffs
   depth_32fc1_scale: 1.0       # 32FC1 depth is in metres (REP 117)
   depth_16uc1_scale: 0.001     # 16UC1 depth is in millimetres
   denoise: none                # none | median | bilateral
@@ -118,8 +122,8 @@ poses:
   loop_max_angle_deg: 45.0
   loop_candidate_stride: 5     # only test every Nth keyframe as loop target
   loop_max_candidates_per_frame: 3
-  loop_query_stride: 10        # only query every Nth keyframe (10 = every 0.67 s; 4x longer bag than the 2026-10 one)
-  loop_force_head_tail: 0      # force first N vs last N keyframes; 0 = off: this walk is not known to end where it started
+  loop_query_stride: 5         # only query every Nth keyframe
+  loop_force_head_tail: 0      # force first N vs last N keyframes; 0 = off (only for walks known to end where they started)
   loop_force_stride: 3
   icp_voxel: 0.04              # m, voxel for colored ICP
   icp_max_iter: [50, 30, 14]
@@ -187,13 +191,16 @@ tsdf:
   voxel_length: 0.02
   sdf_trunc: 0.08
   depth_scale: 1000.0
-  depth_trunc: 5.0             # m; null = extract.depth_max. Raise (e.g. 7 + voxel 0.03 / sdf_trunc 0.12) if far walls are missing
+  depth_trunc: 5.0             # m, near band; null = extract.depth_max
   frame_stride: 1              # integrate every Nth posed frame
   checkpoint_every: 200        # frames; partial mesh/pointcloud checkpoint (resume = re-integrate up to done frames)
+  far: null                    # optional second, coarser volume for distant geometry (04 docstring), e.g.
+                               # {depth_min: 4.0, depth_trunc: 10.0, voxel_length: 0.05, sdf_trunc: 0.25, near_overlap_m: 0.1}
 
 mesh:
   min_cluster_ratio: 0.001     # keep largest cluster + clusters with area > ratio * total area.
                                # (task default was 0.02; on this data that deletes the table: 0.34% of area)
+  min_cluster_area_m2: null     # also keep clusters with at least this area (m^2); null = ratio only
   target_triangles: 200000
   level_ground: true
   ground_distance_threshold: 0.03
@@ -222,13 +229,32 @@ lidar:
   compare_range_max: 4.0       # m; distance metric only where the RGB-D mesh can exist
   slice_half_thickness: 0.05   # m, mesh slice around the laser plane height
   time_offset_s: 0.0           # s, added to scan stamp before trajectory lookup
-  T_base_laser: null           # [x, y, z, yaw_deg] fixed measured extrinsic; null = use /tf_static
+  T_base_laser: null           # [x, y, z, yaw_deg(, pitch_deg, roll_deg)] fixed extrinsic; null = use /tf_static
   plot_extent_margin: 1.0
   max_points_plot: 200000
 
+render_views:                  # scripts/render_views.py: mesh ray-cast from real poses vs RGB
+  frames: null                 # extracted-frame indices; null = n_auto evenly spaced
+  n_auto: 6
+  columns: 3
+  scale: 0.6
+
+lidar_tilt_fit:                # scripts/fit_lidar_tilt.py: pose-free LiDAR pitch / roll vs camera depth
+  frame_every: 15              # extracted frames between pairs
+  max_dt_s: 0.03               # frame / scan stamp difference
+  range_min: 0.6
+  range_max: 12.0
+  depth_scale: 0.001           # frames on disk are 16-bit mm
+  tol: 0.05                    # |depth / lidar - 1| counted as agreement
+  search_deg: 12.0             # pitch in +-search, roll in +-search/2
+  coarse_step_deg: 1.5
+  fine_step_deg: 0.25
+  range_bins: [[0.6, 2], [2, 4], [4, 6], [6, 8], [8, 12]]
+  focal_scales: [0.85, 0.9, 0.95, 1.0, 1.05]
+
 eval:                          # scripts/eval_poses.py: same metrics for every pose set
   pose_sets:                   # name -> poses.npz (T_world_optical, frame_idx, stamp_ns)
-    v1: outputs/poses/poses.npz
+    v1: ${paths.outputs_dir}/poses/poses.npz
   out_dir: eval
   cloud_every: 10              # accumulated cloud: every Nth posed frame
   cloud_voxel: 0.03
@@ -251,9 +277,14 @@ eval:                          # scripts/eval_poses.py: same metrics for every p
   # Pose-free references from check_head_tail.py: relative pose first-frame -> tail frame, used
   # only for tail frames whose 5 repeated (static-head) registrations agree within ref_max_spread_m.
   # This is the only metric here that sees global drift; the others are local / self-consistent.
-  head_tail_reference: outputs/head_tail/head_tail.json
+  head_tail_reference: ${paths.outputs_dir}/head_tail/head_tail.json
   ref_max_spread_m: 0.08
   ref_max_rot_range_deg: 3.0
+
+test_scene:                    # table detection used by table_check.py (scene_utils); from 2026-10 v2.yaml
+  table_center: null           # [x, y] override; null = detect from the mesh
+  table_search_radius: 1.5     # m around the trajectory centroid
+  table_band: [0.5, 1.1]       # m, height band of the table top / pots
 
 table_check:                   # scripts/table_check.py: ray-cast coverage of the table top
   coverage_radius_frac: 0.7    # disk of this fraction of the detected table radius
@@ -266,14 +297,14 @@ bench:                         # scripts/bench_threads.py: OpenMP threads per st
   max_busy_cores: 2.0          # refuse to start if other work keeps more cores than this busy
   odometry_start: 1000         # extracted-frame index of the first pair
   odometry_pairs: 50
-  loop_cache: outputs/poses/ckpt_loops.json   # v1 loop cache: real loop pairs + their transforms
+  loop_cache: ${paths.outputs_dir}/poses/ckpt_loops.json   # v1 loop cache: real loop pairs + their transforms
   loop_pairs: 10
   loop_pick_stride: 37         # spread the picked pairs over the cache
   fpfh_head: 0                 # pose-free registration pairs (check_head_tail.Registrar)
   fpfh_tails: [2545, 2551, 2557]
   tsdf_start: 1000             # posed-frame index of the first integrated frame
   tsdf_frames: 200
-  mesh_raw: outputs/tsdf/mesh_raw.ply
+  mesh_raw: ${paths.outputs_dir}/tsdf/mesh_raw.ply
   mechanism_check_threads: [1, 8]    # runtime-switch check per step: rt 1 vs env 1, env 1 + rt 8 vs env 8
   pool_steps: [odometry_pool, loop_pool]
   pool_combos: [[1, 32], [2, 16], [4, 8], [8, 4], [16, 2], [32, 1]]   # [processes, threads per process]

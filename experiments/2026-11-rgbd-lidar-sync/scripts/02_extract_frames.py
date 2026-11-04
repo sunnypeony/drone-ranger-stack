@@ -56,6 +56,11 @@ def main():
         if ci is None:
             die(f"no CameraInfo on {T['camera_info']}")
         pairs = match_pairs(rgb_st, dep_st, int(ex["match_tolerance_ns"]))
+        if cfg.get("cutoff_s") is not None and pairs:
+            # hand-trimmed bag: everything after cutoff_s is dropped here, so 03-07 never see it
+            n_all = len(pairs)
+            pairs = [p for p in pairs if (p[0] - pairs[0][0]) / 1e9 <= cfg["cutoff_s"]]
+            print(f"cutoff_s={cfg['cutoff_s']}: {len(pairs)} of {n_all} pairs kept")
         n_rgb_dup = len(rgb_st) - len(set(rgb_st))
         kept = pairs[:: ex["frame_stride"]]
         keep_rgb = {r: i for i, (r, _) in enumerate(kept)}

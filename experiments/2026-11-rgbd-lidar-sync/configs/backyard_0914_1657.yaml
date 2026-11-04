@@ -1,0 +1,11 @@
+# Backyard, 2026-09-14 16:57, 11.6 min, not trimmed (local bag only, not on Hugging Face).
+# Camera often faces the sun -> odometry fails on 8% of pairs; persistent weak depth band at x ~ 280-380 px.
+# Results: README "数据集 backyard_0914_1657".
+base: default.yaml
+dataset: backyard_0914_1657
+
+paths:
+  bag_dir: /home/natasha/rosbags/rosbag2_2026_09_14-16_57_35_0
+
+poses:
+  loop_query_stride: 10        # 4x longer than the table bag; 10 = every 0.67 s
