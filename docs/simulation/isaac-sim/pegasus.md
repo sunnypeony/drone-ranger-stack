@@ -370,9 +370,12 @@ The depth checkers in [`simulation/isaac_sim/usr_scripts/`](../../../simulation/
 python3 simulation/isaac_sim/usr_scripts/depth_checker_purenp.py --ros-args -r /depth:=/drone1/camera/depth
 ```
 
-Alternatives: the manual OmniGraph camera in [cameras.md](cameras.md), or `setup_drone_cameras.py`, which publishes `/drone/rgb` and `/drone/depth`.
-Both need a camera prim under the vehicle body.
-Pegasus spawns the body at `/World/quadrotor/body`; check the exact path in the *Stage* panel before running those scripts.
+Alternatives:
+
+- [`setup_drone_cameras.py`](../../../simulation/isaac_sim/usr_scripts/setup_drone_cameras.py), run in the Script Editor after **Load Vehicle**.
+  It mounts one forward-facing camera under `/World/quadrotor/body/body` and publishes `/drone/rgb`, `/drone/depth` (aligned to RGB) and `/drone/camera_info`.
+  The mount pose is set at the top of the script.
+- The manual OmniGraph camera in [cameras.md](cameras.md). The camera must be placed under the vehicle body, otherwise it stays fixed in the scene.
 
 ---
 
